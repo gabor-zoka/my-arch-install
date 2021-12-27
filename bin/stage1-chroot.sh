@@ -17,7 +17,7 @@ pacman -Sy --noconfirm --needed archlinux-keyring
 
 
 
-# I need perl to edit files in the next stage.
-pacstrap /mnt base perl 
+# Install all modules passed as parameters.
+pacstrap "$@"
 
 onexit 0
