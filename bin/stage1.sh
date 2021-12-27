@@ -116,7 +116,10 @@ cat $td/mirrorlist >>$chr/etc/pacman.d/mirrorlist
 curl -sS -o $chr/bin/stage1-chroot.sh $gh/stage1-chroot.sh
 chmod +x    $chr/bin/stage1-chroot.sh
 
-$chr/bin/arch-chroot $chr /bin/stage1-chroot.sh
+# Params passed will be passed to pacstrap.
+# I need perl for editing configs in the next stages.
+# I also need arch-install-scripts for ach-chroot in the next stages.
+$chr/bin/arch-chroot $chr /bin/stage1-chroot.sh /mnt base perl arch-install-scripts
 
 
 
