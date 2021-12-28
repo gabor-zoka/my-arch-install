@@ -36,9 +36,12 @@ fi
 root=
 pacserve=
 country=
-eval set -- "$(getopt -o r:p:C: -l root:,pacserve:,country: -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o Dr:p:C: -l root:,pacserve:,country: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
+    -D)
+      set -x
+      ;;
     -r|--root)
       root="$2"
       shift
@@ -76,7 +79,7 @@ if [[ $pacserve ]]; then
     pacserve+=:15678
   fi
 
-  if ! curl -IsS --connect-timeout 2 "http://$pacserve" >/dev/null; then
+  if ! curl -sSI --connect-timeout 2 "http://$pacserve" >/dev/null; then
     echo "ERROR: Connection failed to pacserve = $pacserve" >&2
     onexit 1
   fi
@@ -90,7 +93,7 @@ if [[ -z $country ]]; then
   country="$(curl -sS https://ipapi.co/country)"
 fi
 
-curl -sS "https://archlinux.org/mirrorlist/?country=$country&use_mirror_status=on" >$td/mirrorlist
+curl -sSfo $td/mirrorlist "https://archlinux.org/mirrorlist/?country=$country&use_mirror_status=on"
 sed -i 's/^#Server/Server/' $td/mirrorlist
 
 server=$(grep ^Server $td/mirrorlist | head -1 | sed 's/^Server = \(.*\)\/$repo\/os\/$arch/\1/')
@@ -114,7 +117,7 @@ bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 if [[ $pacserve ]] && curl -fo $td/$bootstrap "http://$pacserve/pacman/core/os/x86_64/$bootstrap"; then
   curl -sSfo $td/$bootstrap.sig "http://$pacserve/pacman/core/os/x86_64/$bootstrap.sig"
 else
-  curl -fo   $td/$bootstrap     "$server/iso/latest/$bootstrap"
+  curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
   curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
 fi
 
