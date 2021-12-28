@@ -34,21 +34,21 @@ fi
 ### Parameters.
 
 root=
-cache=
+pacserve=
 country=
-eval set -- "$(getopt -o r:c:C: -l root:,cache:,country: -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o r:p:C: -l root:,pacserve:,country: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -r|--root)
       root="$2"
       shift
       ;;
-    -c|--cache)
-      cache="$2"
+    -p|--pacserve)
+      pacserve="$2"
       shift
       ;;
     -C|--country)
-      cache="$2"
+      country="$2"
       shift
       ;;
     --)
@@ -70,6 +70,18 @@ elif [[ -e $root ]]; then
   onexit 1
 fi
 
+if [[ $pacserve ]]; then
+  if ! grep -q : <<<$pacserve; then
+    # No custom port specified. Add the standard port.
+    pacserve+=:15678
+  fi
+
+  if ! curl -IsS --connect-timeout 2 "http://$pacserve" >/dev/null; then
+    echo "ERROR: Connection failed to pacserve = $pacserve" >&2
+    onexit 1
+  fi
+fi
+
 
 
 ### Obtain mirrorlist.
@@ -82,15 +94,25 @@ curl -sS "https://archlinux.org/mirrorlist/?country=$country&use_mirror_status=o
 sed -i 's/^#Server/Server/' $td/mirrorlist
 
 server=$(grep ^Server $td/mirrorlist | head -1 | sed 's/^Server = \(.*\)\/$repo\/os\/$arch/\1/')
+
 version="$(curl -sS "$server/iso/latest/arch/version")"
+
+if [[ -z $version ]]; then
+  # Some mirrors do not serve version. Try again, as new execution of 
+  # https://archlinux.org/mirrorlist/... will get you a list in a different 
+  # order.
+  echo "ERROR: Bootstrap version is empty. Try again" >&2
+  onexit 1
+fi
+
 bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 
 
 
 ### Download and validate the bootstrap image.
 
-if [[ $cache ]] && curl -fo $td/$bootstrap "$cache/$bootstrap"; then
-  curl -sSfo $td/$bootstrap.sig "$cache/$bootstrap.sig"
+if [[ $pacserve ]] && curl -fo $td/$bootstrap "http://$pacserve/pacman/core/os/x86_64/$bootstrap"; then
+  curl -sSfo $td/$bootstrap.sig "http://$pacserve/pacman/core/os/x86_64/$bootstrap.sig"
 else
   curl -fo   $td/$bootstrap     "$server/iso/latest/$bootstrap"
   curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
@@ -106,27 +128,32 @@ chr=$td/root.x86_64
 
 
 
-### Prepare $c/etc/pacman.conf
+### /etc/pacman.conf
 
 sed -i 's/^CheckSpace.*/#&/' $chr/etc/pacman.conf
 
+# Add "Include = /etc/pacman.d/pacserve" before each repo. This makes 
+# sense even if we do not use pacserve as we can keep that file empty.
+sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' $chr/etc/pacman.conf
 
 
-### Prepare $c/etc/pacman.d/mirrorlist
 
-if [[ $cache ]]; then
-  echo "Server = $cache"
+### Mirror lists
+
+mv $td/mirrorlist $chr/etc/pacman.d/mirrorlist
+
+if [[ $pacserve ]]; then
+  echo "Server = http://$pacserve"'/pacman/$repo/$arch'
 else
   :
-fi                  >$chr/etc/pacman.d/mirrorlist
-cat $td/mirrorlist >>$chr/etc/pacman.d/mirrorlist
+fi >$chr/etc/pacman.d/pacserve
 
 
 
 ### Chroot stage
 
-curl -sS -o $chr/bin/stage1-chroot.sh $gh/stage1-chroot.sh
-chmod +x    $chr/bin/stage1-chroot.sh
+curl -sSfo $chr/bin/stage1-chroot.sh $gh/stage1-chroot.sh
+chmod +x   $chr/bin/stage1-chroot.sh
 
 # Params passed to stage1-chroot.sh will be passed to pacstrap.
 # - I need perl for editing configs in the next stages.
@@ -137,6 +164,7 @@ chmod +x    $chr/bin/stage1-chroot.sh
 #   once, and in addition we can rely on linux-lts to kick it off.
 $chr/bin/arch-chroot $chr /bin/stage1-chroot.sh /mnt base perl arch-install-scripts mkinitcpio
 
+# Save the bootstrap so we can save this download next time with pacserve.
 mv $td/$bootstrap{,.sig} $chr/mnt/var/cache/pacman/pkg
 
 
