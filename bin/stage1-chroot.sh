@@ -7,6 +7,27 @@ export LC_ALL=C
 
 
 
+### Parameters.
+
+eval set -- "$(getopt -o D -n "$(basename "$0")" -- "$@")"
+while true; do
+  case $1 in
+    -D)
+      set -x
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "ERROR: Programming error #1: $1" >&2
+      onexit 1
+  esac
+  shift
+done
+
+
+
 ### Prepare the keyring.
 
 pacman-key --init
