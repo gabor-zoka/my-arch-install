@@ -10,7 +10,7 @@ export LC_ALL=C
 ### Prepare the keyring.
 
 pacman-key --init
-pacman-key --populate  archlinux
+pacman-key --populate archlinux
 # Update the db-s, and also refresh archlinux-keyring. (Often *.iso image has 
 # obsolete keyring, which makes the install fail.)
 pacman -Sy --noconfirm --needed archlinux-keyring
