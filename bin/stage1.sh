@@ -65,6 +65,9 @@ done
 if   [[ -z $root ]]; then
   echo "ERROR: Root dir is not set" >&2
   onexit 1
+elif [[ -e $root ]]; then
+  echo "ERROR: Root dir = $root exists" >&2
+  onexit 1
 fi
 
 
@@ -80,22 +83,25 @@ sed -i 's/^#Server/Server/' $td/mirrorlist
 
 server=$(grep ^Server $td/mirrorlist | head -1 | sed 's/^Server = \(.*\)\/$repo\/os\/$arch/\1/')
 version="$(curl -sS "$server/iso/latest/arch/version")"
-bootstrap="$server/iso/latest/archlinux-bootstrap-$version-x86_64.tar.gz"
+bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 
 
 
 ### Download and validate the bootstrap image.
 
-curl     -o $td/bootstrap-x86_64.tar.gz     "$bootstrap"
-curl -sS -o $td/bootstrap-x86_64.tar.gz.sig "$bootstrap".sig
+if [[ $cache ]] && curl -fo $td/$bootstrap "$cache/$bootstrap"; then
+  curl -sSfo $td/$bootstrap.sig "$cache/$bootstrap.sig"
+else
+  curl -fo   $td/$bootstrap     "$server/iso/latest/$bootstrap"
+  curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
+fi
 
 export GNUPGHOME=$td/.gnupg
 push_clean gpgconf --kill all
 gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
-gpg --verify $td/bootstrap-x86_64.tar.gz.sig
+gpg --verify $td/$bootstrap.sig
 
-tar xf $td/bootstrap-x86_64.tar.gz --numeric-owner -C $td
-rm     $td/bootstrap-x86_64.tar.gz
+tar xf $td/$bootstrap --numeric-owner -C $td
 chr=$td/root.x86_64
 
 
@@ -130,6 +136,8 @@ chmod +x    $chr/bin/stage1-chroot.sh
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
 $chr/bin/arch-chroot $chr /bin/stage1-chroot.sh /mnt base perl arch-install-scripts mkinitcpio
+
+mv $td/$bootstrap{,.sig} $chr/mnt/var/cache/pacman/pkg
 
 
 
