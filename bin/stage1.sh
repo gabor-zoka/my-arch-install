@@ -33,14 +33,14 @@ fi
 
 ### Parameters.
 
+debug=
 root=
 pacserve=
 country=
-debug=
-eval set -- "$(getopt -o Dr:p:C: -l root:,pacserve:,country: -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o dr:p:c: -l root:,pacserve:,country: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
-    -D)
+    -d)
       debug=y
       set -x
       ;;
@@ -52,7 +52,7 @@ while true; do
       pacserve="$2"
       shift
       ;;
-    -C|--country)
+    -c|--country)
       country="$2"
       shift
       ;;
@@ -167,7 +167,7 @@ chmod +x   $chr/bin/stage1-chroot.sh
 #   because I want to edit /etc/mkinitcpio.conf before linux-lst kicks off the 
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
-$chr/bin/arch-chroot $chr /bin/stage1-chroot.sh ${debug:+-D} /mnt base perl arch-install-scripts mkinitcpio
+$chr/bin/arch-chroot $chr /bin/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
 # Save the bootstrap so we can save this download next time with pacserve.
 mv $td/$bootstrap{,.sig} $chr/mnt/var/cache/pacman/pkg

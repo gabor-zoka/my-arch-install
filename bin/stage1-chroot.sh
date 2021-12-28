@@ -9,10 +9,10 @@ export LC_ALL=C
 
 ### Parameters.
 
-eval set -- "$(getopt -o D -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o d -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
-    -D)
+    -d)
       set -x
       ;;
     --)
