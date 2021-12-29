@@ -37,7 +37,8 @@ debug=
 root=
 host=
 pacserve=
-eval set -- "$(getopt -o dr:h:p: -l root:,host:,pacserve: -n "$(basename "$0")" -- "$@")"
+repo=
+eval set -- "$(getopt -o dr:h:p:e: -l root:,host:,pacserve:,repo: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -54,6 +55,10 @@ while true; do
       ;;
     -p|--pacserve)
       pacserve="$2"
+      shift
+      ;;
+    -e|--repo)
+      repo="$2"
       shift
       ;;
     --)
@@ -96,6 +101,13 @@ if [[ $pacserve ]]; then
 
   if ! curl -sSI --connect-timeout 2 "http://$pacserve" >/dev/null; then
     echo "ERROR: Connection failed to pacserve = $pacserve" >&2
+    onexit 1
+  fi
+fi
+
+if [[ $repo ]]; then
+  if ! curl -sSI --connect-timeout 2 "http://$repo" >/dev/null; then
+    echo "ERROR: Connection failed to repo = $repo" >&2
     onexit 1
   fi
 fi
@@ -148,7 +160,7 @@ chr=$td/root.x86_64
 
 ### /etc/pacman.conf
 
-sed -i 's/^CheckSpace.*/#&/' $chr/etc/pacman.conf
+sed -i 's/^CheckSpace/#CheckSpace/' $chr/etc/pacman.conf
 
 # Add "Include = /etc/pacman.d/pacserve" before each repo. This makes 
 # sense even if we do not use pacserve as we can keep that file empty.
@@ -159,12 +171,6 @@ sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' $ch
 ### Mirror lists
 
 mv $td/mirrorlist $chr/etc/pacman.d/mirrorlist
-
-if [[ $pacserve ]]; then
-  echo "Server = http://$pacserve"'/pacman/$repo/$arch'
-else
-  :
-fi >$chr/etc/pacman.d/pacserve
 
 
 
@@ -185,15 +191,23 @@ $chr/bin/arch-chroot $chr /bin/stage1-chroot.sh ${debug:+-d} /mnt base perl arch
 # Save the bootstrap so we can save this download next time with pacserve.
 mv $td/$bootstrap{,.sig} $chr/mnt/var/cache/pacman/pkg
 
+# Save repo files here (albeit we did not need it in this script) so we do not 
+# need to support --pacserve and --repo parameters beyond this point.
+if [[ $pacserve ]]; then
+  echo "Server = http://$pacserve"'/pacman/$repo/$arch'
+else
+  :
+fi                           >$chr/mnt/etc/pacman.d/pacserve
+echo "Server = http://$repo" >$chr/mnt/etc/pacman.d/gabor-zoka 
+
 
 
 ### Save the image.
 
 btrfs su create "$root"
-root_snap="$(dirname "$root")/.snapshot/$(basename "$root")"; mkdir -p "$root_snap"
-
 tar cf - --numeric-owner -C $chr/mnt . | (cd -- "$root" && tar xf - --numeric-owner)
 
+root_snap="$(dirname "$root")/.snapshot/$(basename "$root")"; mkdir -p "$root_snap"
 btrfs su snap -r "$root" "$root_snap/$(date -uIm)"
 
 onexit 0
