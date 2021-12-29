@@ -1,8 +1,5 @@
-a2ps
-android-file-transfer
-arch-install
 arch-install-scripts
-arch-wiki-lite
+arch-wiki-docs
 aria2
 asp
 atomicparsley
@@ -11,7 +8,6 @@ base
 bash-completion
 bash-header
 bc
-bind
 btrfs-progs
 cabextract
 catdoc
@@ -34,10 +30,8 @@ dosbox
 dosfstools
 ecryptfs-utils
 etc-update
-etckeeper
 exfat-utils
 feh
-ffmpeg-static
 firefox
 flac-arcrc
 flac-gz
@@ -63,7 +57,6 @@ hyphen-en
 hyphen-hu
 i7z
 icaclient
-ideviceinstaller-git
 iftop
 ifuse
 imagemagick-doc
@@ -78,14 +71,11 @@ ledger
 lesspipe
 lftp
 libdvdcss
-libdvdread
-libmtp
-libopusenc-gz
 libreoffice-still-en-gb
 libreoffice-still-hu
 libusb-compat
 libva-intel-driver
-libvorbis-aotuv
+libvorbis-aotuv-gz
 links
 linux-firmware
 linux-lts
@@ -93,7 +83,6 @@ loudgain
 lsdvd
 lshw
 lsof
-lvm2
 lzop
 m4acut
 mac
@@ -115,7 +104,6 @@ mkvalidator
 mkvtoolnix-cli
 moreutils
 mp3directcut
-mp3guessenc
 mp3splt
 mp3val
 mplayer
@@ -140,8 +128,6 @@ perl
 perl-audio-flac-header
 perl-dbd-sqlite
 perl-image-exiftool
-perl-math-round
-perl-module-install
 perl-musicbrainz-discid
 perl-rename
 perl-string-shellquote
@@ -150,12 +136,10 @@ picard
 pkgfile
 pngquant
 ponymix
-poppler-glib
 profile-sync-daemon
 pv
 pwgen
 python-eyed3
-python-opencv
 python-pexpect
 qemu
 rcs
@@ -174,6 +158,7 @@ smartcard-udev
 smartmontools
 sox
 squashfs-tools
+st
 subedit
 subversion
 syslinux
@@ -181,7 +166,6 @@ testdisk
 texlive-latexextra
 tinywm-git
 tmux
-twolame
 uchardet
 units
 unrar
@@ -190,7 +174,6 @@ upx
 us-altgr-intl-console-hu
 usbutils
 valgrind
-vlc
 vorbis-tools
 vorbisgain
 wcalc
@@ -203,8 +186,8 @@ xorg-xinit
 xscreensaver
 yasm
 youtube-dl
-youtube-dlc-git
 yq
+yt-dlp
 zathura-djvu
 zathura-pdf-mupdf
 zathura-ps
