@@ -35,9 +35,9 @@ fi
 
 debug=
 root=
+host=
 pacserve=
-country=
-eval set -- "$(getopt -o dr:p:c: -l root:,pacserve:,country: -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o dr:h:p: -l root:,host:,pacserve: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -48,12 +48,12 @@ while true; do
       root="$2"
       shift
       ;;
-    -p|--pacserve)
-      pacserve="$2"
+    -h|--host)
+      host="$2"
       shift
       ;;
-    -c|--country)
-      country="$2"
+    -p|--pacserve)
+      pacserve="$2"
       shift
       ;;
     --)
@@ -67,13 +67,26 @@ while true; do
   shift
 done
 
-if   [[ -z $root ]]; then
+if [[ -z $root ]]; then
   echo "ERROR: Root dir is not set" >&2
   onexit 1
 elif [[ -e $root ]]; then
   echo "ERROR: Root dir = $root exists" >&2
   onexit 1
 fi
+
+country=
+case $host in
+  bud|laptop)
+    country=HU
+    ;;
+  gla)
+    country=GB
+    ;;
+  *)
+    echo "ERROR: host = $host is invalid" >&2
+    onexit 1
+esac
 
 if [[ $pacserve ]]; then
   if ! grep -q : <<<$pacserve; then
