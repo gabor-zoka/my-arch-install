@@ -161,7 +161,13 @@ EOF
 
 
 
-###
+### Install
 
+curl -sSfo $td/group.list $gh/../pkg-list/$host.group.list
+curl -sSfo $td/exp.list   $gh/../pkg-list/$host.exp.list
+
+perl -i -ne 'if(!m{^\s*(\#|$)}){print}' $td/group.list $td/exp.list
+
+pacman -Sy --noconfirm --needed   $(cat $td/group.list $td/exp.list)
 
 onexit 0

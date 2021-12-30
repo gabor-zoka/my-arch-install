@@ -226,8 +226,8 @@ mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chr/mnt/var/cache/pacman
 
 ### Chroot
 
-curl -sSfo $chr/bin/stage1-chroot.sh $gh/stage1-chroot.sh
-chmod +x   $chr/bin/stage1-chroot.sh
+curl -sSfo $chr/root/stage1-chroot.sh $gh/stage1-chroot.sh
+chmod +x   $chr/root/stage1-chroot.sh
 
 # Params passed to stage1-chroot.sh will be passed to pacstrap.
 # - I need perl for editing configs in the next stages.
@@ -236,7 +236,7 @@ chmod +x   $chr/bin/stage1-chroot.sh
 #   because I want to edit /etc/mkinitcpio.conf before linux-lst kicks off the 
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
-$chr/bin/arch-chroot $chr /bin/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
+$chr/bin/arch-chroot $chr /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
 # Save repo files here (albeit we did not need it in this script) so we do not 
 # need to support --pacserve and --repo parameters beyond this point.
@@ -251,6 +251,6 @@ btrfs su create "$root"
 tar cf - --numeric-owner -C $chr/mnt . | (cd -- "$root" && tar xf - --numeric-owner)
 
 root_snap="$mount/.snapshot/$(basename "$root")"; install -d "$root_snap"
-btrfs su snap -r "$root" "$root_snap/$(date -uIm)"
+btrfs su snap -r "$root" "$root_snap/$(date -uIs)"
 
 onexit 0

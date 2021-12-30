@@ -39,12 +39,15 @@ done
 if   [[ -z $root ]]; then
   echo "ERROR: Root dir is not set" >&2
   onexit 1
+elif [[ -z $host ]]; then
+  echo "ERROR: Host is not set" >&2
+  onexit 1
 fi
 
 
 
-curl -sSfo $root/root/stage2-chroot.sh $gh/stage2-chroot.sh
-chmod +x   $root/root/stage2-chroot.sh
+curl -sSfo "$root/root/stage2-chroot.sh" $gh/stage2-chroot.sh
+chmod +x   "$root/root/stage2-chroot.sh"
 
 "$root/bin/arch-chroot" "$root" /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host}
 
@@ -52,7 +55,6 @@ chmod +x   $root/root/stage2-chroot.sh
 
 ### Snapshot the image.
 
-root_snap="$(dirname "$root")/.snapshot/$(basename "$root")"; mkdir -p "$root_snap"
-btrfs su snap -r "$root" "$root_snap/$(date -uIm)"
+btrfs su snap -r "$root" "$(dirname "$root")/.snapshot/$(basename "$root")/$(date -uIs)"
 
 onexit 0
