@@ -76,8 +76,13 @@ if [[ $host == laptop ]]; then
 fi
 
 # Reset the local to the new settings.
-LANG=
+#
+# /etc/profile.d/locale.sh refers to undefined vars in a number of places (not 
+# just at 'unset LANG'). Hence I have to turn off 'set -u'.
+set +u
+unset LANG
 source /etc/profile.d/locale.sh
+set -u
 
 # I also set the time-zone here out of convenince.
 ln -sf /usr/share/zoneinfo/$city /etc/localtime
