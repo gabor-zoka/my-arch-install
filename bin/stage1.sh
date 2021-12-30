@@ -42,22 +42,27 @@ eval set -- "$(getopt -o dr:h:p:e: -l root:,host:,pacserve:,repo: -n "$(basename
 while true; do
   case $1 in
     -d)
+      # Optional
       debug=y
       set -x
       ;;
     -r|--root)
+      # Mandatory
       root="$2"
       shift
       ;;
     -h|--host)
+      # Mandatory
       host="$2"
       shift
       ;;
     -p|--pacserve)
+      # Optional
       pacserve="$2"
       shift
       ;;
     -e|--repo)
+      # Mandatory
       repo="$2"
       shift
       ;;
@@ -137,18 +142,21 @@ if [[ -z $country ]]; then
   country="$(curl -sS https://ipapi.co/country)"
 fi
 
-curl -sSfo $td/mirrorlist "https://archlinux.org/mirrorlist/?country=$country&use_mirror_status=on"
-sed -i 's/^#Server/Server/' $td/mirrorlist
+# Some mirrors do not serve version. Try again, as new execution of 
+# https://archlinux.org/mirrorlist/... will get you a list in a different 
+# order.
+try=0
+version=
+while [[ $((try++)) -lt 5 ]] && [[ -z $version ]]; do
+  curl -sSfo $td/mirrorlist "https://archlinux.org/mirrorlist/?country=$country&use_mirror_status=on"
+  sed -i 's/^#Server/Server/' $td/mirrorlist
 
-server=$(grep ^Server $td/mirrorlist | head -1 | sed 's/^Server = \(.*\)\/$repo\/os\/$arch/\1/')
-
-version="$(curl -sS "$server/iso/latest/arch/version")"
+  server=$(grep ^Server $td/mirrorlist | head -1 | sed 's/^Server = \(.*\)\/$repo\/os\/$arch/\1/')
+  version="$(curl -sS "$server/iso/latest/arch/version")"
+done
 
 if [[ -z $version ]]; then
-  # Some mirrors do not serve version. Try again, as new execution of 
-  # https://archlinux.org/mirrorlist/... will get you a list in a different 
-  # order.
-  echo "ERROR: Bootstrap version is empty. Try again" >&2
+  echo "ERROR: Bootstrap version is empty" >&2
   onexit 1
 fi
 
@@ -181,15 +189,12 @@ gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
 gpg --verify $td/$bootstrap.sig
 
 tar xf $td/$bootstrap --numeric-owner -C $td
+chr=$td/root.x86_64
 
 if [[ $save_bootstrap ]]; then
   # Save the bootstrap so we can save this download next time with pacserve.
   mv $td/$bootstrap{,.sig} "$mount/pkg"
 fi
-
-
-
-chr=$td/root.x86_64
 
 
 
