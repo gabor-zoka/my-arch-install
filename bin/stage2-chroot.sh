@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
-set -e; . <(curl -sS $gh/bash-header.sh)
+set -e; . <(curl -sS $gh/bash-header2.sh)
 
 # Safe setting and should be available.
 export LC_ALL=C
