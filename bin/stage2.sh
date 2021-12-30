@@ -49,6 +49,17 @@ fi
 
 
 
+### Mount /var/cache/pacman/pkg
+
+mount="$(dirname "$root")"
+dev="$(findmnt -fn -o source "$mount")"
+push_clean umount "$root/var/cache/pacman/pkg"
+mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" "$root/var/cache/pacman/pkg"
+
+
+
+### Chroot
+
 curl -sSfo "$root/root/stage2-chroot.sh" $gh/stage2-chroot.sh
 chmod +x   "$root/root/stage2-chroot.sh"
 

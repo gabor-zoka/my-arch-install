@@ -216,7 +216,7 @@ fi >$chr/etc/pacman.d/pacserve
 
 
 
-### Mount pkg subvolume
+### Mount /var/cache/pacman/pkg
 
 install        -d $chr/mnt/var/cache/pacman/pkg
 push_clean umount $chr/mnt/var/cache/pacman/pkg
