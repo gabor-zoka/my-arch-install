@@ -76,7 +76,7 @@ if [[ $host == laptop ]]; then
 fi
 
 # Reset the local to the new settings.
-unset LANG
+LANG=
 source /etc/profile.d/locale.sh
 
 # I also set the time-zone here out of convenince.

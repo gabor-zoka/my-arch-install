@@ -14,14 +14,17 @@ eval set -- "$(getopt -o dr:h: -l root:,host: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
+      # Optional
       debug=y
       set -x
       ;;
     -r|--root)
+      # Mandatory
       root="$2"
       shift
       ;;
     -h|--host)
+      # Mandatory
       host="$2"
       shift
       ;;
