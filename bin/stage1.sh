@@ -124,6 +124,9 @@ if [[ $repo ]]; then
     echo "ERROR: Connection failed to repo = $repo" >&2
     onexit 1
   fi
+else
+  echo "ERROR: --repo (aka my custom repo) is not set" >&2
+  onexit 1
 fi
 
 
