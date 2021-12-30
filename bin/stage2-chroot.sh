@@ -93,8 +93,8 @@ ln -sf /usr/share/zoneinfo/$city /etc/localtime
 
 # Pacstrap do not copy /etc/pacman.conf over, so I have to repeat commenting 
 # out CheckSpace.
-sed -i 's/^CheckSpace/#CheckSpace/' $chr/etc/pacman.conf
-sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' $chr/etc/pacman.conf
+sed -i 's/^CheckSpace/#CheckSpace/'                                          /etc/pacman.conf
+sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' /etc/pacman.conf
 
 tee -a /etc/pacman.conf >/dev/null <<'EOF'
 
