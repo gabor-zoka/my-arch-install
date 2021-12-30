@@ -76,9 +76,23 @@ if [[ -z $root ]]; then
   echo "ERROR: Root dir is not set" >&2
   onexit 1
 elif [[ -e $root ]]; then
-  echo "ERROR: Root dir = $root exists" >&2
+  echo "ERROR: $root exists" >&2
   onexit 1
 fi
+
+mount="$(dirname "$root")"
+
+if ! dev="$(findmnt -fn -o source "$mount")"; then
+  echo "ERROR: $mount is not a mount point" >&2
+  onexit 1
+fi
+
+if ! btrfs su show "$mount/pkg" >/dev/null; then
+  echo "ERROR: $mount/pkg is not a BTRFS subvolume" >&2
+  onexit 1
+fi
+
+
 
 country=
 case $host in
@@ -141,11 +155,21 @@ bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 
 ### Download and validate the bootstrap image.
 
-if [[ $pacserve ]] && curl -fo $td/$bootstrap "http://$pacserve/pacman/core/os/x86_64/$bootstrap"; then
+# Do not use -L on curl as pacserve redirects if the file is missing, but we are 
+# cheating with storing bootstrap under pacstrap. It would not be at that 
+# location in a real host.
+#
+# As per above, if the bootstrap is not on pacserve it returns a URL of one of 
+# the mirrors. Hence the curl will not fail even if the bootstrap is not there. 
+# Hence I test the file.
+save_bootstrap=
+if [[ $pacserve ]] && curl -fo $td/$bootstrap "http://$pacserve/pacman/core/os/x86_64/$bootstrap" && gzip -t $td/$bootstrap; then
   curl -sSfo $td/$bootstrap.sig "http://$pacserve/pacman/core/os/x86_64/$bootstrap.sig"
 else
   curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
   curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
+
+  save_bootstrap=y
 fi
 
 export GNUPGHOME=$td/.gnupg
@@ -154,6 +178,14 @@ gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
 gpg --verify $td/$bootstrap.sig
 
 tar xf $td/$bootstrap --numeric-owner -C $td
+
+if [[ $save_bootstrap ]]; then
+  # Save the bootstrap so we can save this download next time with pacserve.
+  mv $td/$bootstrap{,.sig} "$mount/pkg"
+fi
+
+
+
 chr=$td/root.x86_64
 
 
@@ -166,15 +198,25 @@ sed -i 's/^CheckSpace/#CheckSpace/' $chr/etc/pacman.conf
 # sense even if we do not use pacserve as we can keep that file empty.
 sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' $chr/etc/pacman.conf
 
-
-
-### Mirror lists
-
 mv $td/mirrorlist $chr/etc/pacman.d/mirrorlist
 
+if [[ $pacserve ]]; then
+  echo "Server = http://$pacserve"'/pacman/$repo/$arch'
+else
+  :
+fi >$chr/etc/pacman.d/pacserve
 
 
-### Chroot stage
+
+### Mount pkg subvolume
+
+install        -d $chr/mnt/var/cache/pacman/pkg
+push_clean umount $chr/mnt/var/cache/pacman/pkg
+mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chr/mnt/var/cache/pacman/pkg
+
+
+
+### Chroot
 
 curl -sSfo $chr/bin/stage1-chroot.sh $gh/stage1-chroot.sh
 chmod +x   $chr/bin/stage1-chroot.sh
@@ -188,16 +230,9 @@ chmod +x   $chr/bin/stage1-chroot.sh
 #   once, and in addition we can rely on linux-lts to kick it off.
 $chr/bin/arch-chroot $chr /bin/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
-# Save the bootstrap so we can save this download next time with pacserve.
-mv $td/$bootstrap{,.sig} $chr/mnt/var/cache/pacman/pkg
-
 # Save repo files here (albeit we did not need it in this script) so we do not 
 # need to support --pacserve and --repo parameters beyond this point.
-if [[ $pacserve ]]; then
-  echo "Server = http://$pacserve"'/pacman/$repo/$arch'
-else
-  :
-fi                           >$chr/mnt/etc/pacman.d/pacserve
+mv $chr/etc/pacman.d/pacserve $chr/mnt/etc/pacman.d
 echo "Server = http://$repo" >$chr/mnt/etc/pacman.d/gabor-zoka 
 
 
@@ -207,7 +242,7 @@ echo "Server = http://$repo" >$chr/mnt/etc/pacman.d/gabor-zoka
 btrfs su create "$root"
 tar cf - --numeric-owner -C $chr/mnt . | (cd -- "$root" && tar xf - --numeric-owner)
 
-root_snap="$(dirname "$root")/.snapshot/$(basename "$root")"; mkdir -p "$root_snap"
+root_snap="$mount/.snapshot/$(basename "$root")"; install -d "$root_snap"
 btrfs su snap -r "$root" "$root_snap/$(date -uIm)"
 
 onexit 0
