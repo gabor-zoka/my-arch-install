@@ -3,6 +3,11 @@ gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
 set -e; . <(curl -sS $gh/bash-header2.sh)
 
 # Safe setting and should be available.
+#
+# LC_ALL will always override LANG and all the other LC_* variables, whether 
+# they are set or not. LC_ALL is the only LC_* variable which cannot be set in 
+# locale.conf files: it is meant to be used only for testing or troubleshooting 
+# purposes
 export LC_ALL=C
 
 

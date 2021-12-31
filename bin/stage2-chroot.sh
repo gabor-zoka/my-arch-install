@@ -76,10 +76,15 @@ if [[ $host == laptop ]]; then
 fi
 
 # Reset the local to the new settings.
-#
+
+# LC_ALL overrides all LC_* variables. It was the safe choice until now, but we 
+# have to unset it now to let the rest take effect.
+unset LC_ALL
 # /etc/profile.d/locale.sh refers to undefined vars in a number of places (not 
 # just at 'unset LANG'). Hence I have to turn off 'set -u'.
 set +u
+# The below 2 lines from 
+# https://wiki.archlinux.org/title/Locale#Make_locale_changes_immediate
 unset LANG
 source /etc/profile.d/locale.sh
 set -u
