@@ -172,7 +172,7 @@ bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 ### Download and validate the bootstrap image.
 
 # Do not use -L on curl as pacserve redirects if the file is missing, but we are 
-# cheating with storing bootstrap under pacstrap. It would not be at that 
+# cheating with storing bootstrap under pacserve. It would not be at that 
 # location in a real host.
 #
 # As per above, if the bootstrap is not on pacserve it returns a URL of one of 
@@ -234,6 +234,9 @@ mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chr/mnt/var/cache/pacman
 curl -sSfo $chr/root/stage1-chroot.sh $gh/stage1-chroot.sh
 chmod +x   $chr/root/stage1-chroot.sh
 
+# I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
+# a login shell, so /etc/profile is executed.
+#
 # Params passed to stage1-chroot.sh will be passed to pacstrap.
 # - I need perl for editing configs in the next stages.
 # - I need arch-install-scripts for ach-chroot in the next stages.
@@ -241,7 +244,7 @@ chmod +x   $chr/root/stage1-chroot.sh
 #   because I want to edit /etc/mkinitcpio.conf before linux-lst kicks off the 
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
-$chr/bin/arch-chroot $chr /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
+$chr/bin/arch-chroot $chr runuser - root -c /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
 # Save repo files here (albeit we did not need it in this script) so we do not 
 # need to support --pacserve and --repo parameters beyond this point.

@@ -63,7 +63,7 @@ mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" "$root/var/cache/pacman/p
 curl -sSfo "$root/root/stage2-chroot.sh" $gh/stage2-chroot.sh
 chmod +x   "$root/root/stage2-chroot.sh"
 
-"$root/bin/arch-chroot" "$root" /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host}
+"$root/bin/arch-chroot" "$root" runuser - root -c /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host}
 
 
 
