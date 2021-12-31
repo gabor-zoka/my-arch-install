@@ -1,9 +1,7 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -S runuser -s /bin/bash - root
+export LC_ALL=C
 gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
 set -e; . <(curl -sS $gh/bash-header2.sh)
-
-# Safe setting and should be available.
-export LC_ALL=C
 
 
 
@@ -63,7 +61,7 @@ mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" "$root/var/cache/pacman/p
 curl -sSfo "$root/root/stage2-chroot.sh" $gh/stage2-chroot.sh
 chmod +x   "$root/root/stage2-chroot.sh"
 
-"$root/bin/arch-chroot" "$root" runuser - root -c /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host}
+"$root/bin/arch-chroot" "$root" runuser -s /bin/bash - root /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host}
 
 
 

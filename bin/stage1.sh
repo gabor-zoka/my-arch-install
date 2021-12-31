@@ -1,14 +1,22 @@
-#!/usr/bin/env bash
-gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
-set -e; . <(curl -sS $gh/bash-header2.sh)
+#!/usr/bin/env -S runuser -s /bin/bash - root
 
-# Safe setting and should be available.
+# The above runs this script in a sanitized environment, which runs 
+# /etc/profile, too (if it is a bash shell). Just in case root has a different 
+# shell in /etc/passwd, I also specified '-s /bin/bash' to ensure it is the 
+# standard bash shell.
+
+# Let's not pick up anything from /etc/locale.conf, but set a safe setting 
+# which should be available.
 #
 # LC_ALL will always override LANG and all the other LC_* variables, whether 
 # they are set or not. LC_ALL is the only LC_* variable which cannot be set in 
 # locale.conf files: it is meant to be used only for testing or troubleshooting 
 # purposes
 export LC_ALL=C
+
+# My normal script boilerplate:
+gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
+set -e; . <(curl -sS $gh/bash-header2.sh)
 
 
 
@@ -235,7 +243,9 @@ curl -sSfo $chr/root/stage1-chroot.sh $gh/stage1-chroot.sh
 chmod +x   $chr/root/stage1-chroot.sh
 
 # I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
-# a login shell, so /etc/profile is executed.
+# a login shell, so /etc/profile is executed. It will pass 
+# /root/stage1-chroot.sh and the rest to the default shell. To make sure it is 
+# bash, I used '-s /bin/bash'.
 #
 # Params passed to stage1-chroot.sh will be passed to pacstrap.
 # - I need perl for editing configs in the next stages.
@@ -244,7 +254,7 @@ chmod +x   $chr/root/stage1-chroot.sh
 #   because I want to edit /etc/mkinitcpio.conf before linux-lst kicks off the 
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
-$chr/bin/arch-chroot $chr runuser - root -c /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
+$chr/bin/arch-chroot $chr runuser -s /bin/bash - root /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
 # Save repo files here (albeit we did not need it in this script) so we do not 
 # need to support --pacserve and --repo parameters beyond this point.
