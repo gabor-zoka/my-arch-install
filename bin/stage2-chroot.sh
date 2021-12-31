@@ -171,7 +171,11 @@ EOF
 curl -sSfo $td/group.list $gh/../pkg-list/$host.group.list
 curl -sSfo $td/exp.list   $gh/../pkg-list/$host.exp.list
 
-perl -i -ne 'if(!m{^\s*(\#|$)}){print}' $td/group.list $td/exp.list
+# Remove comments, and pacserve.
+#
+# pacserve install conflicts on my custom /etc/pacman.d/pacserve. We install 
+# that as the last one seperately.
+perl -i -ne 'if(!m{^\s*(\#|$)} && !m{^\s*pacserve\s*$}){print}' $td/group.list $td/exp.list
 
 pacman -Sy --noconfirm --needed   $(cat $td/group.list $td/exp.list)
 
