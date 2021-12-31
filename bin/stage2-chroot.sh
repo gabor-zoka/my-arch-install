@@ -95,11 +95,9 @@ ln -sf /usr/share/zoneinfo/$city /etc/localtime
 # out CheckSpace.
 sed -i 's/^CheckSpace/#CheckSpace/'                                          /etc/pacman.conf
 sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' /etc/pacman.conf
+sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist'                 /etc/pacman.conf
 
 tee -a /etc/pacman.conf >/dev/null <<'EOF'
-
-# Tired of the mirrorlist.pacnew files.
-NoExtract = etc/pacman.d/mirrorlist
 
 # Enable multilib for Wine
 [multilib]
