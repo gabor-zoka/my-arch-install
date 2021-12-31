@@ -202,7 +202,7 @@ gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
 gpg --verify $td/$bootstrap.sig
 
 tar xf $td/$bootstrap --numeric-owner -C $td
-chr=$td/root.x86_64
+chrt=$td/root.x86_64
 
 if [[ $save_bootstrap ]]; then
   # Save the bootstrap so we can save this download next time with pacserve.
@@ -213,34 +213,34 @@ fi
 
 ### /etc/pacman.conf
 
-sed -i 's/^CheckSpace/#CheckSpace/' $chr/etc/pacman.conf
+sed -i 's/^CheckSpace/#CheckSpace/' $chrt/etc/pacman.conf
 
 # Add "Include = /etc/pacman.d/pacserve" before each repo. This makes 
 # sense even if we do not use pacserve as we can keep that file empty.
-sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' $chr/etc/pacman.conf
+sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' $chrt/etc/pacman.conf
 
-mv $td/mirrorlist $chr/etc/pacman.d/mirrorlist
+mv $td/mirrorlist $chrt/etc/pacman.d/mirrorlist
 
 if [[ $pacserve ]]; then
   echo "Server = http://$pacserve"'/pacman/$repo/$arch'
 else
   :
-fi >$chr/etc/pacman.d/pacserve
+fi >$chrt/etc/pacman.d/pacserve
 
 
 
 ### Mount /var/cache/pacman/pkg
 
-install        -d $chr/mnt/var/cache/pacman/pkg
-push_clean umount $chr/mnt/var/cache/pacman/pkg
-mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chr/mnt/var/cache/pacman/pkg
+install        -d $chrt/mnt/var/cache/pacman/pkg
+push_clean umount $chrt/mnt/var/cache/pacman/pkg
+mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chrt/mnt/var/cache/pacman/pkg
 
 
 
 ### Chroot
 
-curl -sSfo $chr/root/stage1-chroot.sh $gh/stage1-chroot.sh
-chmod +x   $chr/root/stage1-chroot.sh
+curl -sSfo $chrt/root/stage1-chroot.sh $gh/stage1-chroot.sh
+chmod +x   $chrt/root/stage1-chroot.sh
 
 # I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
 # a login shell, so /etc/profile is executed. It will pass 
@@ -254,19 +254,19 @@ chmod +x   $chr/root/stage1-chroot.sh
 #   because I want to edit /etc/mkinitcpio.conf before linux-lst kicks off the 
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
-$chr/bin/arch-chroot $chr runuser -s /bin/bash - root /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
+"$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
 # Save repo files here (albeit we did not need it in this script) so we do not 
 # need to support --pacserve and --repo parameters beyond this point.
-mv $chr/etc/pacman.d/pacserve $chr/mnt/etc/pacman.d
-echo "Server = http://$repo" >$chr/mnt/etc/pacman.d/gabor-zoka 
+mv $chrt/etc/pacman.d/pacserve $chrt/mnt/etc/pacman.d
+echo "Server = http://$repo"  >$chrt/mnt/etc/pacman.d/gabor-zoka 
 
 
 
 ### Save the image.
 
 btrfs su create "$root"
-tar cf - --numeric-owner -C $chr/mnt . | (cd -- "$root" && tar xf - --numeric-owner)
+tar cf - --numeric-owner -C $chrt/mnt . | (cd -- "$root" && tar xf - --numeric-owner)
 
 root_snap="$mount/.snapshot/$(basename "$root")"; install -d "$root_snap"
 btrfs su snap -r "$root" "$root_snap/$(date -uIs)"
