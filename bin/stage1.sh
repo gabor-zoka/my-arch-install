@@ -234,6 +234,8 @@ fi >$chrt/etc/pacman.d/pacserve
 
 ### Mount /var/cache/pacman/pkg
 
+# Use the centralised pkg cache, so even if I do not have pacserve running, the 
+# previously downloaded packages are available.
 install        -d $chrt/mnt/var/cache/pacman/pkg
 push_clean umount $chrt/mnt/var/cache/pacman/pkg
 mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chrt/mnt/var/cache/pacman/pkg
