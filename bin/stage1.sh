@@ -245,6 +245,15 @@ mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chrt/mnt/var/cache/pacma
 curl -sSfo $chrt/root/stage1-chroot.sh $gh/stage1-chroot.sh
 chmod +x   $chrt/root/stage1-chroot.sh
 
+# As per man 8 arch-chroot, do the below trick to avoid
+#
+# ==> WARNING: xxxx is not a mountpoint. This may have undesirable side effects.
+#
+# error message. This makes the installation safer as "pacman(8) or findmnt(8) 
+# have an accurate hierarchy of the mounted filesystems within the chroot."
+push_clean umount    "$chrt"
+mount --bind "$chrt" "$chrt"
+
 # I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
 # a login shell, so /etc/profile is executed. It will pass 
 # /root/stage1-chroot.sh and the rest to the default shell. To make sure it is 
