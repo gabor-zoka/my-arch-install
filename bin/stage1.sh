@@ -257,7 +257,7 @@ chmod +x   $chrt/root/stage1-chroot.sh
 #   because I want to edit /etc/mkinitcpio.conf before linux-lst kicks off the 
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
-"$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
+"$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root -- /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
 # Save repo files here (albeit we did not need it in this script) so we do not 
 # need to support --pacserve and --repo parameters beyond this point.
