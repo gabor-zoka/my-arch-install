@@ -5,6 +5,10 @@ set -e; . <(curl -sS $gh/bash-header2.sh)
 # Safe setting and should be available.
 export LC_ALL=C
 
+# pacman will use a gpg, too, so have our own just like in stage1.sh.
+export GNUPGHOME=$td/.gnupg
+push_clean gpgconf --kill all
+
 
 
 ### Parameters.

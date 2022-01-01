@@ -1,4 +1,4 @@
-#!/usr/bin/env -S runuser -s /bin/bash - root
+#!/usr/bin/env -S runuser -s /bin/bash - root --
 
 # The above runs this script in a sanitized environment, which runs 
 # /etc/profile, too (if it is a bash shell). Just in case root has a different 
@@ -17,6 +17,11 @@ export LC_ALL=C
 # My normal script boilerplate:
 gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
 set -e; . <(curl -sS $gh/bash-header2.sh)
+
+# Have another gpg so we do not interfere with the root's gpg.
+export GNUPGHOME=$td/.gnupg
+# Make sure we bring down all its apps at the end.
+push_clean gpgconf --kill all
 
 
 
@@ -196,8 +201,6 @@ else
   save_bootstrap=y
 fi
 
-export GNUPGHOME=$td/.gnupg
-push_clean gpgconf --kill all
 gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
 gpg --verify $td/$bootstrap.sig
 

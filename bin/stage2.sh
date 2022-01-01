@@ -1,4 +1,4 @@
-#!/usr/bin/env -S runuser -s /bin/bash - root
+#!/usr/bin/env -S runuser -s /bin/bash - root --
 export LC_ALL=C
 gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
 set -e; . <(curl -sS $gh/bash-header2.sh)
