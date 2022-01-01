@@ -234,6 +234,20 @@ fi >$chrt/etc/pacman.d/pacserve
 
 ### Mount /var/cache/pacman/pkg
 
+# As per "man 8 arch-chroot", do the below trick to avoid
+#
+# ==> WARNING: xxxx is not a mountpoint. This may have undesirable side effects.
+#
+# error message. This makes the installation safer as "pacman(8) or findmnt(8) 
+# have an accurate hierarchy of the mounted filesystems within the chroot" 
+# (apparently)
+#
+# This has to be before mounting "pkg" cache as the mount point of "pkg" would 
+# be inside this "$chrt" mount point. If it is done in the other way around, 
+# the "pkg" mount point would be empty.
+push_clean umount    "$chrt"
+mount --bind "$chrt" "$chrt"
+
 # Use the centralised pkg cache, so even if I do not have pacserve running, the 
 # previously downloaded packages are available.
 install        -d $chrt/mnt/var/cache/pacman/pkg
@@ -246,15 +260,6 @@ mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chrt/mnt/var/cache/pacma
 
 curl -sSfo $chrt/root/stage1-chroot.sh $gh/stage1-chroot.sh
 chmod +x   $chrt/root/stage1-chroot.sh
-
-# As per man 8 arch-chroot, do the below trick to avoid
-#
-# ==> WARNING: xxxx is not a mountpoint. This may have undesirable side effects.
-#
-# error message. This makes the installation safer as "pacman(8) or findmnt(8) 
-# have an accurate hierarchy of the mounted filesystems within the chroot."
-push_clean umount    "$chrt"
-mount --bind "$chrt" "$chrt"
 
 # I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
 # a login shell, so /etc/profile is executed. It will pass 
