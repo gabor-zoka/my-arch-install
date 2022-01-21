@@ -39,10 +39,12 @@ case $host in
   bud|gla)
     keymap=us-altgr-intl-console-hu
     city=Europe/London
+    list=bud
     ;;
   laptop)
     keymap=hu
     city=Europe/Budapest
+    list=laptop
     ;;
   *)
     echo "ERROR: host = $host is invalid" >&2
@@ -175,15 +177,15 @@ EOF
 
 ### Install
 
-curl -sSfo $td/group.list $gh/../pkg-list/$host.group.list
-curl -sSfo $td/exp.list   $gh/../pkg-list/$host.exp.list
+curl -sSfo $td/grp.list $gh/../list/$list/grp.list
+curl -sSfo $td/exp.list $gh/../list/$list/exp.list
 
 # Remove comments, and pacserve.
 #
 # pacserve install conflicts on my custom /etc/pacman.d/pacserve. We install 
 # that as the last one seperately.
-perl -i -ne 'if(!m{^\s*(\#|$)} && !m{^\s*pacserve\s*$}){print}' $td/group.list $td/exp.list
+perl -i -ne 'if(!m{^\s*(\#|$)} && !m{^\s*pacserve\s*$}){print}' $td/grp.list $td/exp.list
 
-pacman -Sy --noconfirm --needed   $(cat $td/group.list $td/exp.list)
+pacman -Sy --noconfirm --needed $(cat $td/grp.list $td/exp.list)
 
 onexit 0
