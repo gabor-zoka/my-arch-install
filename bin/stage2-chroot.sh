@@ -188,4 +188,8 @@ perl -i -ne 'if(!m{^\s*(\#|$)} && !m{^\s*pacserve\s*$}){print}' $td/grp.list $td
 
 pacman -Sy --noconfirm --needed $(cat $td/grp.list $td/exp.list)
 
+# There was an issue umounting /run dir. So it seems we need to sleep a bit 
+# before arch-chroot umounts everything.
+sleep 5
+
 onexit 0
