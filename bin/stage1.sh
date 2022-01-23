@@ -23,6 +23,10 @@ export GNUPGHOME=$td/.gnupg
 # Make sure we bring down all its apps at the end.
 push_clean gpgconf --kill all
 
+btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
+
+shopt -so nullglob
+
 
 
 ### One-off sanity checks.
@@ -95,24 +99,38 @@ while true; do
   shift
 done
 
-if [[ -z $root ]]; then
+if   [[ -z $root ]]; then
   echo "ERROR: Root dir is not set" >&2
-  onexit 1
-elif [[ -e $root ]]; then
-  echo "ERROR: $root exists" >&2
   onexit 1
 fi
 
-mount="$(dirname "$root")"
+mount="$(dirname -- "$root")"
+name="$(basename -- "$root")"
 
-if ! dev="$(findmnt -fn -o source "$mount")"; then
+if ! dev="$(findmnt -fn -o source -- "$mount")"; then
   echo "ERROR: $mount is not a mount point" >&2
   onexit 1
 fi
 
-if ! btrfs su show "$mount/pkg" >/dev/null; then
-  echo "ERROR: $mount/pkg is not a BTRFS subvolume" >&2
-  onexit 1
+if [[ -e "$root" ]]; then
+  btrfs su delete -- "$root"
+fi
+
+root_snap="$mount/.snapshot/$name"
+
+if [[ -e $root_snap ]]; then
+  for i in "$root_snap"/*; do
+    btrfs su delete -- "$i"
+  done
+fi
+
+if [[ -e "$mount/pkg" ]]; then
+  if ! btrfs su show -- "$mount/pkg" >/dev/null; then
+    echo "ERROR: $mount/pkg is not a BTRFS subvolume" >&2
+    onexit 1
+  fi
+else
+  btrfs su create -- "$mount/pkg"
 fi
 
 
@@ -234,7 +252,7 @@ fi >$chrt/etc/pacman.d/pacserve
 
 
 
-### Mount /var/cache/pacman/pkg
+### Prep for chroot
 
 # As per "man 8 arch-chroot", do the below trick to avoid
 #
@@ -247,14 +265,19 @@ fi >$chrt/etc/pacman.d/pacserve
 # This has to be before mounting "pkg" cache as the mount point of "pkg" would 
 # be inside this "$chrt" mount point. If it is done in the other way around, 
 # the "pkg" mount point would be empty.
-push_clean umount    "$chrt"
-mount --bind "$chrt" "$chrt"
+push_clean umount    -- "$chrt"
+mount --bind "$chrt" -- "$chrt"
+
+btrfs su create -- "$root"
+
+push_clean umount                              -- "$chrt/mnt"
+mount -t btrfs -o $btrfs,subvol="$name" "$dev" -- "$chrt/mnt"
 
 # Use the centralised pkg cache, so even if I do not have pacserve running, the 
 # previously downloaded packages are available.
-install        -d $chrt/mnt/var/cache/pacman/pkg
-push_clean umount $chrt/mnt/var/cache/pacman/pkg
-mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" "$chrt/mnt/var/cache/pacman/pkg"
+install -d                                 -- "$chrt/mnt/var/cache/pacman/pkg"
+push_clean umount                          -- "$chrt/mnt/var/cache/pacman/pkg"
+mount -t btrfs -o $btrfs,subvol=pkg "$dev" -- "$chrt/mnt/var/cache/pacman/pkg"
 
 
 
@@ -286,10 +309,7 @@ echo "Server = http://$repo"  >$chrt/mnt/etc/pacman.d/gabor-zoka
 
 ### Save the image.
 
-btrfs su create "$root"
-tar cf - --numeric-owner -C $chrt/mnt . | (cd -- "$root" && tar xf - --numeric-owner)
-
-root_snap="$mount/.snapshot/$(basename "$root")"; install -d "$root_snap"
-btrfs su snap -r "$root" "$root_snap/$(date -uIs)"
+install -d -- "$root_snap"
+btrfs su snap -r -- "$root" "$root_snap/$(date -uIs)"
 
 onexit 0
