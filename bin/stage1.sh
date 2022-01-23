@@ -25,7 +25,7 @@ push_clean gpgconf --kill all
 
 btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 
-shopt -so nullglob
+shopt -s nullglob
 
 
 
@@ -113,14 +113,14 @@ if ! dev="$(findmnt -fn -o source -- "$mount")"; then
 fi
 
 if [[ -e "$root" ]]; then
-  btrfs su delete -- "$root"
+  btrfs su del -- "$root"
 fi
 
 root_snap="$mount/.snapshot/$name"
 
 if [[ -e $root_snap ]]; then
   for i in "$root_snap"/*; do
-    btrfs su delete -- "$i"
+    btrfs su del -- "$i"
   done
 fi
 
@@ -299,6 +299,16 @@ chmod +x   $chrt/root/stage1-chroot.sh
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
 "$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root -- /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
+
+# systemd-tmpfiles creates 2 subvolumes if filesystem is btrfs.
+# See:
+#   - https://bugzilla.redhat.com/show_bug.cgi?id=1327596
+#   - https://bbs.archlinux.org/viewtopic.php?id=260291
+# I have to get rid of them
+for i in portables machines; do
+  btrfs su del -- "$chrt/mnt/var/lib/$i"
+  install -d   -- "$chrt/mnt/var/lib/$i"
+done
 
 # Save repo files here (albeit we did not need it in this script) so we do not 
 # need to support --pacserve and --repo parameters beyond this point.
