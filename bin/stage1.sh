@@ -182,35 +182,37 @@ bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 
 
 
-### Download and validate the bootstrap image.
-
-# Do not use -L on curl as pacserve redirects if the file is missing, but we are 
-# cheating with storing bootstrap under pacserve. It would not be at that 
-# location in a real host.
-#
-# As per above, if the bootstrap is not on pacserve it returns a URL of one of 
-# the mirrors. Hence the curl will not fail even if the bootstrap is not there. 
-# Hence I test the file.
-save_bootstrap=
-if [[ $pacserve ]] && curl -fo $td/$bootstrap "http://$pacserve/pacman/core/os/x86_64/$bootstrap" && gzip -t $td/$bootstrap; then
-  curl -sSfo $td/$bootstrap.sig "http://$pacserve/pacman/core/os/x86_64/$bootstrap.sig"
-else
-  curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
-  curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
-
-  save_bootstrap=y
-fi
-
 gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
-gpg --verify $td/$bootstrap.sig
 
-tar xf $td/$bootstrap --numeric-owner -C $td
-chrt=$td/root.x86_64
+if [[ -e "$mount/pkg/$bootstrap" ]]; then
+  gpg --verify "$mount/pkg/$bootstrap.sig"
 
-if [[ $save_bootstrap ]]; then
-  # Save the bootstrap so we can save this download next time with pacserve.
+  tar xf "$mount/pkg/$bootstrap" --numeric-owner -C $td
+else
+  ### Download and validate the bootstrap image.
+
+  # Do not use -L on curl as pacserve redirects if the file is missing, but we are 
+  # cheating with storing bootstrap under pacserve. It would not be at that 
+  # location in a real host.
+  #
+  # As per above, if the bootstrap is not on pacserve it returns a URL of one of 
+  # the mirrors. Hence the curl will not fail even if the bootstrap is not there. 
+  # Hence I test the file.
+  if [[ $pacserve ]] && curl -fo $td/$bootstrap "http://$pacserve/pacman/core/os/x86_64/$bootstrap" && gzip -t $td/$bootstrap; then
+    curl -sSfo $td/$bootstrap.sig "http://$pacserve/pacman/core/os/x86_64/$bootstrap.sig"
+  else
+    curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
+    curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
+  fi
+
+  gpg --verify $td/$bootstrap.sig
+
+  tar xf $td/$bootstrap --numeric-owner -C $td
+
   mv $td/$bootstrap{,.sig} "$mount/pkg"
 fi
+
+chrt=$td/root.x86_64
 
 
 
@@ -252,7 +254,7 @@ mount --bind "$chrt" "$chrt"
 # previously downloaded packages are available.
 install        -d $chrt/mnt/var/cache/pacman/pkg
 push_clean umount $chrt/mnt/var/cache/pacman/pkg
-mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" $chrt/mnt/var/cache/pacman/pkg
+mount -t btrfs -o noatime,commit=300,subvol=pkg "$dev" "$chrt/mnt/var/cache/pacman/pkg"
 
 
 
