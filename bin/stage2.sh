@@ -68,6 +68,15 @@ chmod +x   "$root/root/stage2-chroot.sh"
 
 
 
+### Pacnew check
+
+if [[ $(find $root/etc -iname '*.pacnew') ]]; then
+  echo "ERROR: *.pacnew file(s) in $root/etc"
+  onexit 1
+fi
+
+
+
 ### Snapshot the image.
 
 btrfs su snap -r "$root" "$(dirname "$root")/.snapshot/$(basename "$root")/$(date -uIs)"

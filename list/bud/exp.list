@@ -23,6 +23,7 @@ cuetools
 cvs
 darktable
 dcraw
+ddclient
 dhex
 dnsmasq
 dos2unix
@@ -64,6 +65,7 @@ imagemagick-doc
 imagemagick-fftw
 intel-ucode
 iotop
+iptables
 iw
 jmtpfs
 jq

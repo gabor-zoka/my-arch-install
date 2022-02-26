@@ -38,12 +38,10 @@ done
 case $host in
   bud|gla)
     keymap=us-altgr-intl-console-hu
-    city=Europe/London
     list=bud
     ;;
   laptop)
     keymap=hu
-    city=Europe/Budapest
     list=laptop
     ;;
   *)
@@ -94,9 +92,6 @@ set +u
 unset LANG
 source /etc/profile.d/locale.sh
 set -u
-
-# I also set the time-zone here out of convenince.
-ln -sf /usr/share/zoneinfo/$city /etc/localtime
 
 
 
