@@ -9,6 +9,7 @@ bash-completion
 bash-header
 bc
 btrfs-progs
+buku
 cabextract
 catdoc
 cdrtools
@@ -138,6 +139,7 @@ perl-string-shellquote
 perl-text-xsv
 picard
 pkgfile
+pngcheck
 pngquant
 ponymix
 profile-sync-daemon
@@ -178,6 +180,7 @@ upx
 us-altgr-intl-console-hu
 usbutils
 valgrind
+vivid
 vorbis-tools
 vorbisgain
 wcalc
