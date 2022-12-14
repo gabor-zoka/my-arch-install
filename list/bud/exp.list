@@ -127,6 +127,7 @@ pacserve
 pam-gpg-smartcard
 parallel
 pass
+pdftk
 perl
 perl-audio-flac-header
 perl-dbd-sqlite

@@ -254,7 +254,7 @@ for i in {03..39}; do
   echo "LABEL=$i  /mnt/$i  btrfs  noatime,noacl,commit=300,autodefrag,compress=zstd,noauto  0 0" >>$root/etc/fstab
 done
 
-mkdir /mnt/{syst,data,boot,cdrom,camera,winxp-laptop} /mnt/{00..39}
+mkdir /mnt/{syst,data,boot,cdrom,camera,winxp-laptop,secret,secret/gabor} /mnt/{00..39}
 
 
 
