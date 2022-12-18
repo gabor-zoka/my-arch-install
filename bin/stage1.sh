@@ -14,9 +14,9 @@
 # purposes
 export LC_ALL=C
 
+bin="$(dirname "$0")"
 # My normal script boilerplate:
-gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
-set -e; . <(curl -sS $gh/bash-header2.sh)
+set -e; . "$bin/bash-header2.sh"
 
 # Have another gpg so we do not interfere with the root's gpg.
 export GNUPGHOME=$td/.gnupg
@@ -57,10 +57,8 @@ fi
 
 debug=
 root=
-host=
 pacserve=
-repo=
-eval set -- "$(getopt -o dr:h:p:e: -l root:,host:,pacserve:,repo: -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o dr:p: -l root:,pacserve -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -73,19 +71,9 @@ while true; do
       root="$2"
       shift
       ;;
-    -h|--host)
-      # Mandatory
-      host="$2"
-      shift
-      ;;
     -p|--pacserve)
       # Optional
       pacserve="$2"
-      shift
-      ;;
-    -e|--repo)
-      # Mandatory
-      repo="$2"
       shift
       ;;
     --)
@@ -104,49 +92,44 @@ if   [[ -z $root ]]; then
   onexit 1
 fi
 
-mount="$(dirname -- "$root")"
-name="$(basename -- "$root")"
-
-if ! dev="$(findmnt -fn -o source -- "$mount")"; then
-  echo "ERROR: $mount is not a mount point" >&2
-  onexit 1
-fi
+root_dir="$(dirname -- "$root")"
 
 if [[ -e "$root" ]]; then
   btrfs su del -- "$root"
+elif [[ ! -d $root_dir ]]; then
+  echo "ERROR: $root_dir exists and it is not a directory" >&2
+  onexit 1
+fi
+btrfs su create -- "$root"
+
+root_vol="$(btrfs su show -- "$root" | head -1)"
+
+if ! root_dev="$(findmnt -fn -o source -- "$root_dir")"; then
+  echo "ERROR: $root_dir is not a mount point" >&2
+  onexit 1
 fi
 
-root_snap="$mount/.snapshot/$name"
-
-if [[ -e $root_snap ]]; then
-  for i in "$root_snap"/*; do
-    btrfs su del -- "$i"
-  done
+root_snap="$root_dir/.snapshot/$(basename "$root")"
+if   [[ ! -e   $root_snap ]]; then
+  install -d  "$root_snap"
+elif [[ ! -d   $root_snap ]]; then
+  echo "ERROR: $root_snap exists and it is not a directory" >&2
+  onexit 1
 fi
 
-if [[ -e "$mount/pkg" ]]; then
-  if ! btrfs su show -- "$mount/pkg" >/dev/null; then
-    echo "ERROR: $mount/pkg is not a BTRFS subvolume" >&2
+
+
+pkg="$root_dir/pkg"
+if [[ -e $pkg ]]; then
+  if ! btrfs su show -- "$pkg" >/dev/null; then
+    echo "ERROR: $pkg is not a BTRFS subvolume" >&2
     onexit 1
   fi
 else
-  btrfs su create -- "$mount/pkg"
+  btrfs su create -- "$pkg"
 fi
 
 
-
-country=
-case $host in
-  bud|laptop)
-    country=HU
-    ;;
-  gla)
-    country=GB
-    ;;
-  *)
-    echo "ERROR: host = $host is invalid" >&2
-    onexit 1
-esac
 
 if [[ $pacserve ]]; then
   if ! grep -q : <<<$pacserve; then
@@ -160,23 +143,11 @@ if [[ $pacserve ]]; then
   fi
 fi
 
-if [[ $repo ]]; then
-  if ! curl -sSI --connect-timeout 2 "http://$repo" >/dev/null; then
-    echo "ERROR: Connection failed to repo = $repo" >&2
-    onexit 1
-  fi
-else
-  echo "ERROR: --repo (aka my custom repo) is not set" >&2
-  onexit 1
-fi
-
 
 
 ### Obtain mirrorlist.
 
-if [[ -z $country ]]; then
-  country="$(curl -sS https://ipapi.co/country)"
-fi
+country="$(curl -sS https://ipapi.co/country)"
 
 # Some mirrors do not serve version. Try again, as new execution of 
 # https://archlinux.org/mirrorlist/... will get you a list in a different 
@@ -202,10 +173,10 @@ bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 
 gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
 
-if [[ -e "$mount/pkg/$bootstrap" ]]; then
-  gpg --verify "$mount/pkg/$bootstrap.sig"
+if [[ -e "$pkg/$bootstrap" ]]; then
+  gpg --verify "$pkg/$bootstrap.sig"
 
-  tar xf "$mount/pkg/$bootstrap" --numeric-owner -C $td
+  tar xf "$pkg/$bootstrap" --numeric-owner -C $td
 else
   ### Download and validate the bootstrap image.
 
@@ -227,7 +198,7 @@ else
 
   tar xf $td/$bootstrap --numeric-owner -C $td
 
-  mv $td/$bootstrap{,.sig} "$mount/pkg"
+  mv -- $td/$bootstrap{,.sig} "$pkg"
 fi
 
 chrt=$td/root.x86_64
@@ -268,23 +239,20 @@ fi >$chrt/etc/pacman.d/pacserve
 push_clean umount    -- "$chrt"
 mount --bind "$chrt" -- "$chrt"
 
-btrfs su create -- "$root"
-
-push_clean umount                              -- "$chrt/mnt"
-mount -t btrfs -o $btrfs,subvol="$name" "$dev" -- "$chrt/mnt"
+push_clean umount                                       -- "$chrt/mnt"
+mount -t btrfs -o $btrfs,subvol="$root_vol" "$root_dev" -- "$chrt/mnt"
 
 # Use the centralised pkg cache, so even if I do not have pacserve running, the 
 # previously downloaded packages are available.
-install -d                                 -- "$chrt/mnt/var/cache/pacman/pkg"
-push_clean umount                          -- "$chrt/mnt/var/cache/pacman/pkg"
-mount -t btrfs -o $btrfs,subvol=pkg "$dev" -- "$chrt/mnt/var/cache/pacman/pkg"
+install -d                                      -- "$chrt/mnt/var/cache/pacman/pkg"
+push_clean umount                               -- "$chrt/mnt/var/cache/pacman/pkg"
+mount -t btrfs -o $btrfs,subvol=pkg "$root_dev" -- "$chrt/mnt/var/cache/pacman/pkg"
 
 
 
 ### Chroot
 
-curl -sSfo $chrt/root/stage1-chroot.sh $gh/stage1-chroot.sh
-chmod +x   $chrt/root/stage1-chroot.sh
+cp -- "$bin/stage1-chroot.sh" "$bin/bash-header2.sh" $chrt/root
 
 # I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
 # a login shell, so /etc/profile is executed. It will pass 
@@ -304,22 +272,17 @@ chmod +x   $chrt/root/stage1-chroot.sh
 # See:
 #   - https://bugzilla.redhat.com/show_bug.cgi?id=1327596
 #   - https://bbs.archlinux.org/viewtopic.php?id=260291
-# I have to get rid of them
+# I have to get rid of them and replace them with normal dir. Then, they remain 
+# normal dirs.
 for i in portables machines; do
   btrfs su del -- "$chrt/mnt/var/lib/$i"
   install -d   -- "$chrt/mnt/var/lib/$i"
 done
 
-# Save repo files here (albeit we did not need it in this script) so we do not 
-# need to support --pacserve and --repo parameters beyond this point.
-mv $chrt/etc/pacman.d/pacserve $chrt/mnt/etc/pacman.d
-echo "Server = http://$repo"  >$chrt/mnt/etc/pacman.d/gabor-zoka 
-
 
 
 ### Save the image.
 
-install -d -- "$root_snap"
 btrfs su snap -r -- "$root" "$root_snap/$(date -uIs)"
 
 onexit 0
