@@ -15,6 +15,8 @@
 export LC_ALL=C
 
 bin="$(dirname "$0")"
+btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
+
 # My normal script boilerplate:
 set -e; . "$bin/bash-header2.sh"
 
@@ -22,8 +24,6 @@ set -e; . "$bin/bash-header2.sh"
 export GNUPGHOME=$td/.gnupg
 # Make sure we bring down all its apps at the end.
 push_clean gpgconf --kill all
-
-btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 
 shopt -s nullglob
 
@@ -58,7 +58,7 @@ fi
 debug=
 root=
 pacserve=
-eval set -- "$(getopt -o dr:p: -l root:,pacserve -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o dr:p: -l root:,pacserve: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -278,6 +278,12 @@ for i in portables machines; do
   btrfs su del -- "$chrt/mnt/var/lib/$i"
   install -d   -- "$chrt/mnt/var/lib/$i"
 done
+
+
+
+sed -i 's/^#\[multilib\]/[multilib]\nInclude = \/etc\/pacman.d\/mirrorlist/'           $chrt/mnt/etc/pacman.conf
+sed -i '/^\[\(core\|extra\|community\|multilib\)\]/a Include = /etc/pacman.d/pacserve' $chrt/mnt/etc/pacman.conf
+mv -- $chrt/etc/pacman.d/pacserve $chrt/mnt/etc/pacman.d
 
 
 
