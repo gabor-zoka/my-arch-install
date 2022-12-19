@@ -101,7 +101,7 @@ if ! root_dev="$(findmnt -fn -o source -- "$root_dir")"; then
   onexit 1
 fi
 
-root_snap="$root_dir/.snapshot/$(basename "$root")"
+root_snap="$root_dir/.snapshot/$(basename -- "$root")"
 if   [[ ! -e   $root_snap ]]; then
   install -d  "$root_snap"
 elif [[ ! -d   $root_snap ]]; then
@@ -130,7 +130,7 @@ country="$(curl -sS https://ipapi.co/country)"
 # order.
 try=0
 version=
-while [[ $((try++)) -lt 5 ]] && [[ -z $version ]]; do
+while [[ $((try++)) -lt 10 ]] && [[ -z $version ]]; do
   curl -sSfo $td/mirrorlist "https://archlinux.org/mirrorlist/?country=$country&use_mirror_status=on"
   sed -i 's/^#Server/Server/' $td/mirrorlist
 
@@ -205,7 +205,8 @@ mount -t btrfs -o $btrfs,subvol=pkg "$root_dev" -- "$chrt/mnt/var/cache/pacman/p
 
 ### Chroot
 
-cp -- "$bin/stage1-chroot.sh" "$bin/bash-header2.sh" $chrt/root
+push_clean rm -- "$chrt/root/bash-header2.sh" "$chrt/root/stage1-chroot.sh"
+cp -- "$bin/bash-header2.sh" "$bin/stage1-chroot.sh" $chrt/root
 
 # I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
 # a login shell, so /etc/profile is executed. It will pass 
@@ -233,6 +234,8 @@ for i in portables machines; do
   install -d   -- "$chrt/mnt/var/lib/$i"
 done
 
+# Pacstrap copies the mirrorlist to the target. Here we make sure that now 
+# *.pacnew files is created for the mirrorlist going forward.
 sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist' $chrt/mnt/etc/pacman.conf
 
 
