@@ -1,9 +1,11 @@
 #!/usr/bin/env -S runuser -s /bin/bash - root --
-export LC_ALL=C
 bin="$(dirname "$0")"
-btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
-
 set -e; . "$bin/bash-header2.sh"
+shopt -s nullglob
+
+
+
+export LC_ALL=C
 
 
 
@@ -11,7 +13,7 @@ debug=
 root=
 host=
 repo=
-eval set -- "$(getopt -o dr:p:h:e: -l root:,host:,repo: -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o dr:h:e: -l root:,host:,repo: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -46,7 +48,7 @@ while true; do
 done
 
 if   [[ -z $root ]]; then
-  echo "ERROR: Root dir is not set" >&2
+  echo "ERROR: Root is not set" >&2
   onexit 1
 elif [[ -z $host ]]; then
   echo "ERROR: Host is not set" >&2
@@ -56,10 +58,27 @@ elif [[ -z $repo ]]; then
   onexit 1
 fi
 
-root_vol="$(btrfs su show -- "$root" | head -1)"
 root_dir="$(dirname -- "$root")"
+root_vol="$(btrfs su show -- "$root" | head -1)"
 root_dev="$(findmnt -fn -o source -- "$root_dir")"
+root_snap="$root_dir/.snapshot/$(basename -- "$root")"
+
 pkg="$root_dir/pkg"
+
+if   [[ -z $repo ]]; then
+  echo "ERROR: Repo is not set" >&2
+  onexit 1
+fi
+
+repo_dir="$(dirname -- "$repo")"
+repo_vol="$(btrfs su show -- "$repo" | head -1)"
+
+if ! repo_dev="$(findmnt -fn -o source -- "$repo_dir")"; then
+  echo "ERROR: $repo_dir is not a mount point" >&2
+  onexit 1
+fi
+
+
 
 case $host in
   bud|gla)
@@ -75,40 +94,29 @@ esac
 
 
 
-if   [[ -z $repo ]]; then
-  echo "ERROR: Repo dir is not set" >&2
-  onexit 1
-fi
+### Mount for chroot
 
-repo_vol="$(btrfs su show -- "$repo" | head -1)"
-repo_dir="$(dirname -- "$repo")"
+btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 
-if ! repo_dev="$(findmnt -fn -o source -- "$repo_dir")"; then
-  echo "ERROR: $repo_dir is not a mount point" >&2
-  onexit 1
-fi
+push_clean umount -- "$root"
+mount --bind      -- "$root" "$root"
 
+push_clean umount                              --             "$root/var/cache/pacman/pkg"
+mount -t btrfs -o $btrfs,subvol=pkg            -- "$root_dev" "$root/var/cache/pacman/pkg"
 
-
-### Mount /var/cache/pacman/pkg
-
-push_clean umount    "$root"
-mount --bind "$root" "$root"
-
-push_clean umount                                          -- "$root/var/cache/pacman/pkg"
-mount -t btrfs -o $btrfs,subvol=pkg "$root_dev"            -- "$root/var/cache/pacman/pkg"
-
-install -d                                                 -- "$root/mnt/repo"
-push_clean umount                                          -- "$root/mnt/repo"
-mount -t btrfs -o $btrfs,ro,subvol="$repo_vol" "$repo_dev" -- "$root/mnt/repo"
+install -d                                     --             "$root/mnt/repo"
+push_clean umount                              --             "$root/mnt/repo"
+mount -t btrfs -o $btrfs,subvol="$repo_vol",ro -- "$repo_dev" "$root/mnt/repo"
 
 
 
 ### Chroot
 
-cp -- "$bin/stage2-chroot.sh" "$bin/bash-header2.sh" "$bin/../list/$list/"* $root/root
+push_clean rm -- "$root"/root/{bash-header2.sh,stage2-chroot.sh,exp.list,grp.list}
+cp -- "$bin"/{bash-header2.sh,stage2-chroot.sh} "$bin/../list/$list"/{exp.list,grp.list} "$root"/root
 
-"$root/bin/arch-chroot" "$root" runuser -s /bin/bash - root -- /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host}
+"$root/bin/arch-chroot" "$root" runuser -s /bin/bash - root --\
+  /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host}
 
 
 

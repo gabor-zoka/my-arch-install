@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e; . /root/bash-header2.sh
+shopt -s nullglob
 
-# Safe setting and should be available.
 export LC_ALL=C
 
 # pacman will use a gpg, too, so have our own just like in stage1.sh.
@@ -48,7 +48,44 @@ esac
 
 
 
-### Set the locales
+### Adding my pub key
+
+curl -sS -o $td/gabor-zoka.asc\
+  https://raw.githubusercontent.com/gabor-zoka/personal/master/public-key.asc
+
+pacman-key --add $td/gabor-zoka.asc
+pacman-key --lsign-key "$(gpg --list-packets $td/gabor-zoka.asc |\
+  perl -lne 'if(m{^\s+keyid:\s*(.*)}){print $1;exit()}')"
+
+
+
+### Install Pacserve
+
+tee -a /etc/pacman.conf >/dev/null <<'EOF'
+[multilib]
+Include  = /etc/pacman.d/mirrorlist
+
+[xyne-x86_64]
+SigLevel = Required
+Server   = https://xyne.dev/repos/xyne
+
+[xyne-any]
+SigLevel = Required
+Server   = https://xyne.dev/repos/xyne
+
+[custom-repo]
+SigLevel = Required
+Server   = file:///mnt/repo
+EOF
+
+pacman -Sy --noconfirm --needed pacserve
+
+# Adding the pacserve to pacman.conf.
+sed -i '/^\(Include\|Server\) /i Include = /etc/pacman.d/pacserve' /etc/pacman.conf
+
+
+
+### Set the final locales (as some packages like LibreOffice might need it)
 
 perl -i -pe '$z+=s{^#((en_US|en_DK|hu_HU)\.UTF-8 .*)}{$1};END{die if $z!=3}' /etc/locale.gen
 locale-gen
@@ -92,41 +129,11 @@ set -u
 
 
 
-### /etc/pacman.conf
-
-tee -a /etc/pacman.conf >/dev/null <<'EOF'
-
-[xyne-x86_64]
-SigLevel = Required
-Include  = /etc/pacman.d/pacserve
-Server   = https://xyne.dev/repos/xyne
-
-[xyne-any]
-SigLevel = Required
-Include  = /etc/pacman.d/pacserve
-Server   = https://xyne.dev/repos/xyne
-
-[custom-repo]
-SigLevel = Required
-Include  = /etc/pacman.d/pacserve
-Server   = file:///mnt/repo
-EOF
-
-
-
-### Add me to the keyring.
-
-curl -sS -o $td/gabor-zoka.asc https://raw.githubusercontent.com/gabor-zoka/personal/master/public-key.asc
-
-pacman-key --add $td/gabor-zoka.asc
-pacman-key --lsign-key "$(gpg --list-packets $td/gabor-zoka.asc | perl -lne 'if(m{^\s+keyid:\s*(.*)}){print $1;exit()}')"
-
-
-
-### /etc/mkinitcpio.conf
+### /etc/mkinitcpio.conf (for the boot image)
 
 if [[ $host == qemu ]]; then
-    perl -i -pe '$z+=s{^MODULES=.*}{MODULES=(virtio virtio_blk virtio_pci virtio_net i915)};END{die if $z!=1}' /etc/mkinitcpio.conf
+    perl -i -pe '$z+=s{^MODULES=.*}{MODULES=(virtio virtio_blk virtio_pci virtio_net i915)};END{die if $z!=1}'\
+      /etc/mkinitcpio.conf
 else
     perl -i -pe '$z+=s{^MODULES=.*}{MODULES=(ext2 i915)};END{die if $z!=1}' /etc/mkinitcpio.conf
 fi
@@ -156,9 +163,9 @@ EOF
 
 
 
-### Install
+### Install everything.
 
-pacman -Sy --noconfirm --needed $(cat /root/grp.list /root/exp.list)
+pacsrv -Sy --noconfirm --needed $(cat /root/grp.list /root/exp.list)
 
 # There was an issue umounting /run dir. So it seems we need to sleep a bit 
 # before arch-chroot umounts everything.
