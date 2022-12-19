@@ -14,10 +14,8 @@
 # purposes
 export LC_ALL=C
 
-bin="$(dirname "$0")"
-btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
-
 # My normal script boilerplate:
+bin="$(dirname "$0")"
 set -e; . "$bin/bash-header2.sh"
 
 # Have another gpg so we do not interfere with the root's gpg.
@@ -57,8 +55,7 @@ fi
 
 debug=
 root=
-pacserve=
-eval set -- "$(getopt -o dr:p: -l root:,pacserve: -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o dr: -l root: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -69,11 +66,6 @@ while true; do
     -r|--root)
       # Mandatory
       root="$2"
-      shift
-      ;;
-    -p|--pacserve)
-      # Optional
-      pacserve="$2"
       shift
       ;;
     --)
@@ -131,26 +123,12 @@ fi
 
 
 
-if [[ $pacserve ]]; then
-  if ! grep -q : <<<$pacserve; then
-    # No custom port specified. Add the standard port.
-    pacserve+=:15678
-  fi
-
-  if ! curl -sSI --connect-timeout 2 "http://$pacserve" >/dev/null; then
-    echo "ERROR: Connection failed to pacserve = $pacserve" >&2
-    onexit 1
-  fi
-fi
-
-
-
 ### Obtain mirrorlist.
 
 country="$(curl -sS https://ipapi.co/country)"
 
 # Some mirrors do not serve version. Try again, as new execution of 
-# https://archlinux.org/mirrorlist/... will get you a list in a different 
+# https://archlinux.org/mirrorlist/... will get you the list in a different 
 # order.
 try=0
 version=
@@ -180,19 +158,8 @@ if [[ -e "$pkg/$bootstrap" ]]; then
 else
   ### Download and validate the bootstrap image.
 
-  # Do not use -L on curl as pacserve redirects if the file is missing, but we are 
-  # cheating with storing bootstrap under pacserve. It would not be at that 
-  # location in a real host.
-  #
-  # As per above, if the bootstrap is not on pacserve it returns a URL of one of 
-  # the mirrors. Hence the curl will not fail even if the bootstrap is not there. 
-  # Hence I test the file.
-  if [[ $pacserve ]] && curl -fo $td/$bootstrap "http://$pacserve/pacman/core/os/x86_64/$bootstrap" && gzip -t $td/$bootstrap; then
-    curl -sSfo $td/$bootstrap.sig "http://$pacserve/pacman/core/os/x86_64/$bootstrap.sig"
-  else
-    curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
-    curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
-  fi
+  curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
+  curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
 
   gpg --verify $td/$bootstrap.sig
 
@@ -207,23 +174,14 @@ chrt=$td/root.x86_64
 
 ### /etc/pacman.conf
 
-sed -i 's/^CheckSpace/#CheckSpace/' $chrt/etc/pacman.conf
-
-# Add "Include = /etc/pacman.d/pacserve" before each repo. This makes 
-# sense even if we do not use pacserve as we can keep that file empty.
-sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' $chrt/etc/pacman.conf
-
-mv $td/mirrorlist $chrt/etc/pacman.d/mirrorlist
-
-if [[ $pacserve ]]; then
-  echo "Server = http://$pacserve"'/pacman/$repo/$arch'
-else
-  :
-fi >$chrt/etc/pacman.d/pacserve
+#sed -i 's/^CheckSpace/#CheckSpace/' $chrt/etc/pacman.conf
+mv $td/mirrorlist                   $chrt/etc/pacman.d/mirrorlist
 
 
 
 ### Prep for chroot
+
+btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 
 # As per "man 8 arch-chroot", do the below trick to avoid
 #
@@ -242,8 +200,8 @@ mount --bind "$chrt" -- "$chrt"
 push_clean umount                                       -- "$chrt/mnt"
 mount -t btrfs -o $btrfs,subvol="$root_vol" "$root_dev" -- "$chrt/mnt"
 
-# Use the centralised pkg cache, so even if I do not have pacserve running, the 
-# previously downloaded packages are available.
+# Use the centralised pkg cache, so previously downloaded packages are 
+# available.
 install -d                                      -- "$chrt/mnt/var/cache/pacman/pkg"
 push_clean umount                               -- "$chrt/mnt/var/cache/pacman/pkg"
 mount -t btrfs -o $btrfs,subvol=pkg "$root_dev" -- "$chrt/mnt/var/cache/pacman/pkg"
@@ -266,7 +224,8 @@ cp -- "$bin/stage1-chroot.sh" "$bin/bash-header2.sh" $chrt/root
 #   because I want to edit /etc/mkinitcpio.conf before linux-lst kicks off the 
 #   ramdisk generation. This way we can get away with running mkinitcpio only 
 #   once, and in addition we can rely on linux-lts to kick it off.
-"$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root -- /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
+"$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root --\
+  /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
 # systemd-tmpfiles creates 2 subvolumes if filesystem is btrfs.
 # See:
@@ -279,15 +238,7 @@ for i in portables machines; do
   install -d   -- "$chrt/mnt/var/lib/$i"
 done
 
-
-# Pacstrap do not copy /etc/pacman.conf over, so I have to repeat commenting 
-# out CheckSpace.
-sed -i 's/^CheckSpace/#CheckSpace/'                                                    $chrt/mnt/etc/pacman.conf
-sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist'                           $chrt/mnt/etc/pacman.conf
-
-sed -i 's/^#\[multilib\]/[multilib]\nInclude = \/etc\/pacman.d\/mirrorlist/'           $chrt/mnt/etc/pacman.conf
-sed -i '/^\[\(core\|extra\|community\|multilib\)\]/a Include = /etc/pacman.d/pacserve' $chrt/mnt/etc/pacman.conf
-mv -- $chrt/etc/pacman.d/pacserve $chrt/mnt/etc/pacman.d
+sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist' $chrt/mnt/etc/pacman.conf
 
 
 
