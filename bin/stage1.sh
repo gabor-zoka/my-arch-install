@@ -1,4 +1,9 @@
 #!/usr/bin/env -S runuser -s /bin/bash - root --
+bin="$(dirname "$0")"
+set -e; . "$bin/bash-header2.sh"
+shopt -s nullglob
+
+
 
 # The above runs this script in a sanitized environment, which runs 
 # /etc/profile, too (if it is a bash shell). Just in case root has a different 
@@ -14,16 +19,10 @@
 # purposes
 export LC_ALL=C
 
-# My normal script boilerplate:
-bin="$(dirname "$0")"
-set -e; . "$bin/bash-header2.sh"
-
 # Have another gpg so we do not interfere with the root's gpg.
 export GNUPGHOME=$td/.gnupg
 # Make sure we bring down all its apps at the end.
 push_clean gpgconf --kill all
-
-shopt -s nullglob
 
 
 
@@ -189,24 +188,24 @@ btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 # This has to be before mounting "pkg" cache as the mount point of "pkg" would 
 # be inside this "$chrt" mount point. If it is done in the other way around, 
 # the "pkg" mount point would be empty.
-push_clean umount    -- "$chrt"
-mount --bind "$chrt" -- "$chrt"
+push_clean umount -- "$chrt"
+mount --bind      -- "$chrt" "$chrt"
 
-push_clean umount                                       -- "$chrt/mnt"
-mount -t btrfs -o $btrfs,subvol="$root_vol" "$root_dev" -- "$chrt/mnt"
+push_clean umount                           --             "$chrt/mnt"
+mount -t btrfs -o $btrfs,subvol="$root_vol" -- "$root_dev" "$chrt/mnt"
 
 # Use the centralised pkg cache, so previously downloaded packages are 
 # available.
-install -d                                      -- "$chrt/mnt/var/cache/pacman/pkg"
-push_clean umount                               -- "$chrt/mnt/var/cache/pacman/pkg"
-mount -t btrfs -o $btrfs,subvol=pkg "$root_dev" -- "$chrt/mnt/var/cache/pacman/pkg"
+install -d                          --             "$chrt/mnt/var/cache/pacman/pkg"
+push_clean umount                   --             "$chrt/mnt/var/cache/pacman/pkg"
+mount -t btrfs -o $btrfs,subvol=pkg -- "$root_dev" "$chrt/mnt/var/cache/pacman/pkg"
 
 
 
 ### Chroot
 
-push_clean rm -- "$chrt/root/bash-header2.sh" "$chrt/root/stage1-chroot.sh"
-cp -- "$bin/bash-header2.sh" "$bin/stage1-chroot.sh" $chrt/root
+push_clean rm -- "$chrt"/root/{bash-header2.sh,stage1-chroot.sh}
+cp -- "$bin"/{bash-header2.sh,stage1-chroot.sh} "$chrt"/root
 
 # I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
 # a login shell, so /etc/profile is executed. It will pass 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e; . /root/bash-header2.sh
+shopt -s nullglob
 
-# Safe setting and should be available.
 export LC_ALL=C
 
 # pacman will use a gpg, too, so have our own just like in stage1.sh.
@@ -35,11 +35,10 @@ done
 
 pacman-key --init
 pacman-key --populate archlinux
+
 # Update the db-s, and also refresh archlinux-keyring. (Often *.iso image has 
 # obsolete keyring, which makes the install fail.)
 pacman -Sy --noconfirm --needed archlinux-keyring
-
-
 
 # Install all modules passed as parameters.
 pacstrap "$@"
