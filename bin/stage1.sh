@@ -109,8 +109,6 @@ elif [[ ! -d   $root_snap ]]; then
   onexit 1
 fi
 
-
-
 pkg="$root_dir/pkg"
 if [[ -e $pkg ]]; then
   if ! btrfs su show -- "$pkg" >/dev/null; then
@@ -147,8 +145,6 @@ fi
 
 bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 
-
-
 gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
 
 if [[ -e "$pkg/$bootstrap" ]]; then
@@ -174,12 +170,11 @@ chrt=$td/root.x86_64
 
 ### /etc/pacman.conf
 
-#sed -i 's/^CheckSpace/#CheckSpace/' $chrt/etc/pacman.conf
-mv $td/mirrorlist                   $chrt/etc/pacman.d/mirrorlist
+mv $td/mirrorlist $chrt/etc/pacman.d/mirrorlist
 
 
 
-### Prep for chroot
+### Mount for chroot
 
 btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 
@@ -242,7 +237,7 @@ sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist' $chrt/mnt/etc/pacma
 
 
 
-### Save the image.
+### Create a snapshot.
 
 btrfs su snap -r -- "$root" "$root_snap/$(date -uIs)"
 
