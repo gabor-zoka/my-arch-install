@@ -280,6 +280,10 @@ for i in portables machines; do
 done
 
 
+# Pacstrap do not copy /etc/pacman.conf over, so I have to repeat commenting 
+# out CheckSpace.
+sed -i 's/^CheckSpace/#CheckSpace/'                                                    $chrt/mnt/etc/pacman.conf
+sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist'                           $chrt/mnt/etc/pacman.conf
 
 sed -i 's/^#\[multilib\]/[multilib]\nInclude = \/etc\/pacman.d\/mirrorlist/'           $chrt/mnt/etc/pacman.conf
 sed -i '/^\[\(core\|extra\|community\|multilib\)\]/a Include = /etc/pacman.d/pacserve' $chrt/mnt/etc/pacman.conf

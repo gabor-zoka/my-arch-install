@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-gh=https://raw.githubusercontent.com/gabor-zoka/my-arch-install/main/bin
-set -e; . <(curl -sS $gh/bash-header2.sh)
+set -e; . /root/bash-header2.sh
 
 # Safe setting and should be available.
 export LC_ALL=C
@@ -38,11 +37,9 @@ done
 case $host in
   bud|gla)
     keymap=us-altgr-intl-console-hu
-    list=bud
     ;;
   laptop)
     keymap=hu
-    list=laptop
     ;;
   *)
     echo "ERROR: host = $host is invalid" >&2
@@ -97,18 +94,7 @@ set -u
 
 ### /etc/pacman.conf
 
-# Pacstrap do not copy /etc/pacman.conf over, so I have to repeat commenting 
-# out CheckSpace.
-sed -i 's/^CheckSpace/#CheckSpace/'                                          /etc/pacman.conf
-sed -i '/^\[\(core\|extra\|community\)\]/a Include = /etc/pacman.d/pacserve' /etc/pacman.conf
-sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist'                 /etc/pacman.conf
-
 tee -a /etc/pacman.conf >/dev/null <<'EOF'
-
-# Enable multilib for Wine
-[multilib]
-Include  = /etc/pacman.d/pacserve
-Include  = /etc/pacman.d/mirrorlist
 
 [xyne-x86_64]
 SigLevel = Required
@@ -120,10 +106,10 @@ SigLevel = Required
 Include  = /etc/pacman.d/pacserve
 Server   = https://xyne.dev/repos/xyne
 
-[gabor-zoka]
+[custom-repo]
 SigLevel = Required
 Include  = /etc/pacman.d/pacserve
-Include  = /etc/pacman.d/gabor-zoka
+Server   = file:///mnt/repo
 EOF
 
 
@@ -172,16 +158,7 @@ EOF
 
 ### Install
 
-curl -sSfo $td/grp.list $gh/../list/$list/grp.list
-curl -sSfo $td/exp.list $gh/../list/$list/exp.list
-
-# Remove comments, and pacserve.
-#
-# pacserve install conflicts on my custom /etc/pacman.d/pacserve. We install 
-# that as the last one seperately.
-perl -i -ne 'if(!m{^\s*(\#|$)} && !m{^\s*pacserve\s*$}){print}' $td/grp.list $td/exp.list
-
-pacman -Sy --noconfirm --needed $(cat $td/grp.list $td/exp.list)
+pacman -Sy --noconfirm --needed $(cat /root/grp.list /root/exp.list)
 
 # There was an issue umounting /run dir. So it seems we need to sleep a bit 
 # before arch-chroot umounts everything.
