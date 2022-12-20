@@ -13,7 +13,8 @@ debug=
 root=
 host=
 repo=
-eval set -- "$(getopt -o dr:h:e: -l root:,host:,repo: -n "$(basename "$0")" -- "$@")"
+pacserve=
+eval set -- "$(getopt -o dr:h:e:p -l root:,host:,repo:,pacserve -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -35,6 +36,9 @@ while true; do
       # Mandatory
       repo="$2"
       shift
+      ;;
+    -p|--pacserve)
+      pacserve=y
       ;;
     --)
       shift
@@ -116,7 +120,7 @@ push_clean rm -- "$root"/root/{bash-header2.sh,stage2-chroot.sh,exp.list,grp.lis
 cp -- "$bin"/{bash-header2.sh,stage2-chroot.sh} "$bin/../list/$list"/{exp.list,grp.list} "$root"/root
 
 "$root/bin/arch-chroot" "$root" runuser -s /bin/bash - root --\
-  /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host}
+  /root/stage2-chroot.sh ${debug:+-d} ${host:+-h $host} ${pacserve:+-p}
 
 
 

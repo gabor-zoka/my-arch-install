@@ -13,7 +13,8 @@ push_clean gpgconf --kill all
 ### Parameters.
 
 host=
-eval set -- "$(getopt -o dh: -l host: -n "$(basename "$0")" -- "$@")"
+pacserve=
+eval set -- "$(getopt -o dh:p -l host:,pacserve -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -22,6 +23,9 @@ while true; do
     -h|--host)
       host="$2"
       shift
+      ;;
+    -p|--pacserve)
+      pacserve=y
       ;;
     --)
       shift
@@ -78,10 +82,16 @@ SigLevel = Required
 Server   = file:///mnt/repo
 EOF
 
-pacman -Sy --noconfirm --needed pacserve
+if [[ $pacserve ]]; then
+  pacman -Sy --noconfirm --needed pacserve
 
-# Adding the pacserve to pacman.conf.
-sed -i '/^\(Include\|Server\) /i Include = /etc/pacman.d/pacserve' /etc/pacman.conf
+  # Adding the pacserve to pacman.conf.
+  sed -i '/^\(Include\|Server\) /i Include = /etc/pacman.d/pacserve' /etc/pacman.conf
+
+  pacman=pacman
+else
+  pacman=pacsrv
+fi
 
 
 
@@ -165,7 +175,7 @@ EOF
 
 ### Install everything.
 
-pacsrv -Sy --noconfirm --needed $(cat /root/grp.list /root/exp.list)
+$pacman -Sy --noconfirm --needed $(cat /root/grp.list /root/exp.list)
 
 # There was an issue umounting /run dir. So it seems we need to sleep a bit 
 # before arch-chroot umounts everything.
