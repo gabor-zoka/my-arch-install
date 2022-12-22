@@ -54,7 +54,8 @@ fi
 
 debug=
 root=
-eval set -- "$(getopt -o dr: -l root: -n "$(basename "$0")" -- "$@")"
+pkg=
+eval set -- "$(getopt -o dr:g: -l root:,pkg: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -65,6 +66,11 @@ while true; do
     -r|--root)
       # Mandatory
       root="$2"
+      shift
+      ;;
+    -g|--pkg)
+      # Mandatory
+      pkg="$2"
       shift
       ;;
     --)
@@ -78,45 +84,48 @@ while true; do
   shift
 done
 
-if   [[ -z $root ]]; then
+
+
+### Root
+
+if [[ -z $root ]]; then
   echo "ERROR: Root dir is not set" >&2
   onexit 1
 fi
 
-root_dir="$(dirname -- "$root")"
-
-if [[ -e "$root" ]]; then
-  btrfs su del -- "$root"
-elif [[ ! -d $root_dir ]]; then
-  echo "ERROR: $root_dir exists and it is not a directory" >&2
-  onexit 1
+if [[ -e $root ]]; then
+  btrfs su del  -- "$root"
+else
+  install -d -- "$(dirname "$root")"
 fi
 btrfs su create -- "$root"
 
 root_vol="$(btrfs su show -- "$root" | head -1)"
 
-if ! root_dev="$(findmnt -fn -o source -- "$root_dir")"; then
-  echo "ERROR: $root_dir is not a mount point" >&2
+# This does not work:
+# findmnt -o UUID,TARGET -nfT "$root" | read root_uuid root_mnt
+# as bash runs in subshell if pipe is used. Hence this workaround.
+read -r root_uuid root_mnt < <(findmnt -o UUID,TARGET -nfT "$root")
+root_snp="$root_mnt/.snapshot/$(basename -- "$root")"
+
+install -d -- "$root_snp"
+
+
+
+### Pkg
+
+if   [[ -z $pkg ]]; then
+  echo "ERROR: Pkg dir is not set" >&2
   onexit 1
 fi
 
-root_snap="$root_dir/.snapshot/$(basename -- "$root")"
-if   [[ ! -e   $root_snap ]]; then
-  install -d  "$root_snap"
-elif [[ ! -d   $root_snap ]]; then
-  echo "ERROR: $root_snap exists and it is not a directory" >&2
-  onexit 1
-fi
-
-pkg="$root_dir/pkg"
-if [[ -e $pkg ]]; then
-  if ! btrfs su show -- "$pkg" >/dev/null; then
-    echo "ERROR: $pkg is not a BTRFS subvolume" >&2
-    onexit 1
-  fi
-else
+if [[ ! -e $pkg ]]; then
+  install -d -- "$(dirname "$pkg")"
   btrfs su create -- "$pkg"
 fi
+
+pkg_vol="$(btrfs su show -- "$pkg" | head -1)"
+read -r pkg_uuid < <(findmnt -o UUID -nfT "$pkg")
 
 
 
@@ -146,18 +155,19 @@ bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 
 gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
 
-if [[ -e "$pkg/$bootstrap" ]]; then
-  gpg --verify "$pkg/$bootstrap.sig"
+if [[ -e "$pkg/.bootstrap/$bootstrap" ]]; then
+  gpg --verify "$pkg/.bootstrap/$bootstrap.sig"
 else
   curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
   curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
 
   gpg --verify $td/$bootstrap.sig
 
-  mv -- $td/$bootstrap{,.sig} "$pkg"
+  install -d -- "$pkg/.bootstrap"
+  mv -- $td/$bootstrap{,.sig} "$pkg/.bootstrap"
 fi
 
-tar xf "$pkg/$bootstrap" --numeric-owner -C $td
+tar xf "$pkg/.bootstrap/$bootstrap" --numeric-owner -C $td
 chrt=$td/root.x86_64
 
 
@@ -186,14 +196,14 @@ btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 push_clean umount -- "$chrt"
 mount --bind      -- "$chrt" "$chrt"
 
-push_clean umount                           --             "$chrt/mnt"
-mount -t btrfs -o $btrfs,subvol="$root_vol" -- "$root_dev" "$chrt/mnt"
+push_clean umount                           --                "$chrt/mnt"
+mount -t btrfs -o $btrfs,subvol="$root_vol" UUID="$root_uuid" "$chrt/mnt"
 
 # Use the centralised pkg cache, so previously downloaded packages are 
 # available.
-install -d                          --             "$chrt/mnt/var/cache/pacman/pkg"
-push_clean umount                   --             "$chrt/mnt/var/cache/pacman/pkg"
-mount -t btrfs -o $btrfs,subvol=pkg -- "$root_dev" "$chrt/mnt/var/cache/pacman/pkg"
+install -d                                  --                "$chrt/mnt/var/cache/pacman/pkg"
+push_clean umount                           --                "$chrt/mnt/var/cache/pacman/pkg"
+mount -t btrfs -o $btrfs,subvol="$pkg_vol"  UUID="$pkg_uuid"  "$chrt/mnt/var/cache/pacman/pkg"
 
 
 
@@ -217,6 +227,10 @@ cp -- "$bin"/{bash-header2.sh,stage1-chroot.sh} "$chrt"/root
 "$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root --\
   /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
 
+
+
+### Post-chroot
+
 # systemd-tmpfiles creates 2 subvolumes if filesystem is btrfs.
 # See:
 #   - https://bugzilla.redhat.com/show_bug.cgi?id=1327596
@@ -232,10 +246,13 @@ done
 # *.pacnew files is created for the mirrorlist going forward.
 sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist' $chrt/mnt/etc/pacman.conf
 
+echo -e "UUID=$root_uuid\t/\tbtrfs\t$btrfs,subvol=$root_vol\t0 0"                   >>$chrt/mnt/etc/fstab
+echo -e "UUID=$pkg_uuid\t/var/cache/pacman/pkg\tbtrfs\t$btrfs,subvol=$pkg_vol\t0 0" >>$chrt/mnt/etc/fstab
+
 
 
 ### Create a snapshot.
 
-btrfs su snap -r -- "$root" "$root_snap/$(date -uIs)"
+btrfs su snap -r -- "$root" "$root_snp/$(date -uIs)"
 
 onexit 0
