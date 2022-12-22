@@ -88,9 +88,9 @@ if [[ $pacserve ]]; then
   # Adding the pacserve to pacman.conf.
   sed -i '/^\(Include\|Server\) /i Include = /etc/pacman.d/pacserve' /etc/pacman.conf
 
-  pacman=pacman
-else
   pacman=pacsrv
+else
+  pacman=pacman
 fi
 
 

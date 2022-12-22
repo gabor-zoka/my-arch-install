@@ -1,54 +1,48 @@
-### Firewall
+#!/usr/bin/env bash
+set -e; . /root/bash-header2.sh
+shopt -s nullglob
 
-cmd=(set-simple-stateful-firewall --ssh-port 32455 --wan eth0)
+export LC_ALL=C
 
-if [[ $host == laptop ]]; then
-  cmd+=(--wan wlan0)
-elif [[ $host == bud ]]; then
-  # Open port 8000 in the local network for installing on laptop and
-  # julcsi with --local-mirror bud (prior to pacserv).    
-  cmd+=(--local-port 8000 --local-port 8001)
-fi
-
-# /etc/iptables dir has already been created by the "iptables" package.
-"${cmd[@]}" >/etc/iptables/iptables.rules
-chmod og-rwx /etc/iptables/iptables.rules
+# pacman will use a gpg, too, so have our own just like in stage1.sh.
+export GNUPGHOME=$td/.gnupg
+push_clean gpgconf --kill all
 
 
 
-{
-  echo 'auth sufficient pam_exec.so quiet expose_authtok /usr/bin/pam-gpg-smartcard-wrapper gabor'
-  echo
-  cat /etc/pam.d/system-auth
-} | sponge /etc/pam.d/system-auth
+### Parameters.
 
+host=
+pacserve=
+eval set -- "$(getopt -o dh: -l host: -n "$(basename "$0")" -- "$@")"
+while true; do
+  case $1 in
+    -d)
+      set -x
+      ;;    
+    -h|--host)
+      host="$2"
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "ERROR: Programming error #1: $1" >&2
+      onexit 1
+  esac
+  shift
+done
 
-
-# "timedatectl set-ntp true" cannot be used as DBUS is not available in chroot. 
-# This command simply starts and enables systemd-timesyncd service.
-systemctl enable NetworkManager sshd iptables systemd-timesyncd chk-boot
-
-if   [[ $host == laptop ]]; then
-  systemctl enable bluetooth cups
-elif [[ $host == bud ]] || [[ $host == gla ]]; then
-  systemctl enable kill-gpg-agent
-elif [[ $host == bud ]] || [[ $host == laptop ]]; then
-  systemctl enable ddclient
-fi
-
-
-
-### Post-Install Steps
-
-pkgfile --update
-
-if [[ $host == laptop ]]; then
-  # To stop this ****er to pop up constantly.
-  pacman --noconfirm -ddR gnome-keyring
+if [[ ! -e /etc/pacserve ]]; then
+  pacman=pacman
+else
+  pacman=pacsrv
 fi
 
 
 
+echo BLAH
 
-
-
+onexit 0

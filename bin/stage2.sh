@@ -82,8 +82,6 @@ if ! repo_dev="$(findmnt -fn -o source -- "$repo_dir")"; then
   onexit 1
 fi
 
-
-
 case $host in
   bud|gla)
     list=bud

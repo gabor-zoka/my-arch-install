@@ -148,21 +148,16 @@ gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
 
 if [[ -e "$pkg/$bootstrap" ]]; then
   gpg --verify "$pkg/$bootstrap.sig"
-
-  tar xf "$pkg/$bootstrap" --numeric-owner -C $td
 else
-  ### Download and validate the bootstrap image.
-
   curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
   curl -sSfo $td/$bootstrap.sig "$server/iso/latest/$bootstrap.sig"
 
   gpg --verify $td/$bootstrap.sig
 
-  tar xf $td/$bootstrap --numeric-owner -C $td
-
   mv -- $td/$bootstrap{,.sig} "$pkg"
 fi
 
+tar xf "$pkg/$bootstrap" --numeric-owner -C $td
 chrt=$td/root.x86_64
 
 
