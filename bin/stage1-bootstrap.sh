@@ -40,7 +40,10 @@ pacman-key --populate archlinux
 # obsolete keyring, which makes the install fail.)
 pacman -Sy --noconfirm --needed archlinux-keyring
 
-# Install all modules passed as parameters.
-pacstrap "$@"
+
+
+### Install the base
+
+pacstrap /mnt base "$@"
 
 onexit 0

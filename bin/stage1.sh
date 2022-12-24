@@ -55,7 +55,10 @@ fi
 debug=
 root=
 pkg=
-eval set -- "$(getopt -o dr:g: -l root:,pkg: -n "$(basename "$0")" -- "$@")"
+repo=
+email=
+pacserve=
+eval set -- "$(getopt -o dr:p:o:e:s -l root:,pkg:,repo:,email:,pacserve -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -68,10 +71,24 @@ while true; do
       root="$2"
       shift
       ;;
-    -g|--pkg)
+    -p|--pkg)
       # Mandatory
       pkg="$2"
       shift
+      ;;
+    -o|--repo)
+      # Optional
+      repo="$2"
+      shift
+      ;;
+    -e|--email)
+      # Optional
+      email="$2"
+      shift
+      ;;
+    -s|--pacserve)
+      # Optional
+      pacserve=y
       ;;
     --)
       shift
@@ -86,7 +103,7 @@ done
 
 
 
-### Root
+### Root dir (mandatory)
 
 if [[ -z $root ]]; then
   echo "ERROR: Root dir is not set" >&2
@@ -101,20 +118,19 @@ fi
 btrfs su create -- "$root"
 
 root_vol="$(btrfs su show -- "$root" | head -1)"
-
 # This does not work:
 # findmnt -o UUID,TARGET -nfT "$root" | read root_uuid root_mnt
 # as bash runs in subshell if pipe is used. Hence this workaround.
 read -r root_uuid root_mnt < <(findmnt -o UUID,TARGET -nfT "$root")
-root_snp="$root_mnt/.snapshot/$(basename -- "$root")"
 
+root_snp="$(dirname "$root")/.snapshot/$(basename -- "$root")"
 install -d -- "$root_snp"
 
 
 
-### Pkg
+### Pkg dir (mandatory)
 
-if   [[ -z $pkg ]]; then
+if [[ -z $pkg ]]; then
   echo "ERROR: Pkg dir is not set" >&2
   onexit 1
 fi
@@ -126,6 +142,35 @@ fi
 
 pkg_vol="$(btrfs su show -- "$pkg" | head -1)"
 read -r pkg_uuid < <(findmnt -o UUID -nfT "$pkg")
+
+
+
+### Your custom repo dir (optional)
+
+if [[ $repo ]]; then
+  repo_vol="$(btrfs su show -- "$repo" | head -1)"
+  read -r repo_uuid < <(findmnt -o UUID -nfT "$repo")
+  
+  (cd -- "$repo" && ls -- *.db) | sed 's/\.db$//' >$td/repo-name
+
+  if [[ ! -s $td/repo-name ]]; then
+    echo "ERROR: Missing *.db in $repo. Cannot infer repo name" >&2
+    onexit 1
+  fi
+
+  if [[ $(wc -l < $td/repo-name) -gt 1 ]]; then
+    echo "ERROR: Multiple *.db in $repo. Cannot infer repo name" >&2
+    cat -- $td/repo-name >&2
+    onexit 1
+  fi
+
+  repo_name="$(cat $td/repo-name)"
+
+  if [[ $email ]]; then
+    gpg --auto-key-locate hkps://keys.openpgp.org --locate-external-key "$email"
+    gpg -o $td/repo-pubkey.gpg --export "$email"
+  fi
+fi
 
 
 
@@ -153,9 +198,9 @@ fi
 
 bootstrap="archlinux-bootstrap-$version-x86_64.tar.gz"
 
-gpg --auto-key-locate clear,wkd -v --locate-external-key pierre@archlinux.de
+gpg --locate-external-key pierre@archlinux.de
 
-if [[ -e "$pkg/.bootstrap/$bootstrap" ]]; then
+if [[ -e "$pkg/.bootstrap/$bootstrap.sig" ]]; then
   gpg --verify "$pkg/.bootstrap/$bootstrap.sig"
 else
   curl   -fo $td/$bootstrap     "$server/iso/latest/$bootstrap"
@@ -170,15 +215,11 @@ fi
 tar xf "$pkg/.bootstrap/$bootstrap" --numeric-owner -C $td
 chrt=$td/root.x86_64
 
-
-
-### /etc/pacman.conf
-
 mv $td/mirrorlist $chrt/etc/pacman.d/mirrorlist
 
 
 
-### Mount for chroot
+### Prepare bootstrap
 
 btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 
@@ -196,58 +237,100 @@ btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 push_clean umount -- "$chrt"
 mount --bind      -- "$chrt" "$chrt"
 
-push_clean umount                           --                "$chrt/mnt"
+push_clean umount --                                          "$chrt/mnt"
 mount -t btrfs -o $btrfs,subvol="$root_vol" UUID="$root_uuid" "$chrt/mnt"
 
-# Use the centralised pkg cache, so previously downloaded packages are 
-# available.
-install -d                                  --                "$chrt/mnt/var/cache/pacman/pkg"
-push_clean umount                           --                "$chrt/mnt/var/cache/pacman/pkg"
+# Use the centralised pkg cache, so previously downloaded packages are
+# cached locally.
+install -d        --                                          "$chrt/mnt/var/cache/pacman/pkg"
+push_clean umount --                                          "$chrt/mnt/var/cache/pacman/pkg"
 mount -t btrfs -o $btrfs,subvol="$pkg_vol"  UUID="$pkg_uuid"  "$chrt/mnt/var/cache/pacman/pkg"
 
+push_clean rm -- "$chrt"/root/{bash-header2.sh,stage1-bootstrap.sh}
+cp -- "$bin"/{bash-header2.sh,stage1-bootstrap.sh} "$chrt"/root
 
 
-### Chroot
 
-push_clean rm -- "$chrt"/root/{bash-header2.sh,stage1-chroot.sh}
-cp -- "$bin"/{bash-header2.sh,stage1-chroot.sh} "$chrt"/root
+### Bootstrap
 
 # I use "runuser - root -c" to sanitize the env variables, and '-' makes it 
 # a login shell, so /etc/profile is executed. It will pass 
-# /root/stage1-chroot.sh and the rest to the default shell. To make sure it is 
-# bash, I used '-s /bin/bash'.
+# /root/stage1-bootstrap.sh and the rest to the default shell. To make sure it 
+# is bash, I used '-s /bin/bash'.
 #
-# Params passed to stage1-chroot.sh will be passed to pacstrap.
-# - I need perl for editing configs in the next stages.
-# - I need arch-install-scripts for ach-chroot in the next stages.
-# - I install mkinitcpio here before main pacman run, which installs linux-lts, 
-#   because I want to edit /etc/mkinitcpio.conf before linux-lst kicks off the 
-#   ramdisk generation. This way we can get away with running mkinitcpio only 
-#   once, and in addition we can rely on linux-lts to kick it off.
+# I need arch-install-scripts to place arch-chroot into $root to use next time 
+# (post dropping the bootstrap).
 "$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root --\
-  /root/stage1-chroot.sh ${debug:+-d} /mnt base perl arch-install-scripts mkinitcpio
+  /root/stage1-bootstrap.sh ${debug:+-d} arch-install-scripts
 
 
 
-### Post-chroot
+### Clean-up after bootstrap.
 
-# systemd-tmpfiles creates 2 subvolumes if filesystem is btrfs.
+pop_clean 4
+rm -r $chrt
+unset $chrt
+
+
+
+### Prepare root
+
+# systemd-tmpfiles created 2 subvolumes if filesystem is btrfs.
 # See:
 #   - https://bugzilla.redhat.com/show_bug.cgi?id=1327596
 #   - https://bbs.archlinux.org/viewtopic.php?id=260291
 # I have to get rid of them and replace them with normal dir. Then, they remain 
 # normal dirs.
 for i in portables machines; do
-  btrfs su del -- "$chrt/mnt/var/lib/$i"
-  install -d   -- "$chrt/mnt/var/lib/$i"
+  btrfs su del -- "$root/var/lib/$i"
+  install -d   -- "$root/var/lib/$i"
 done
+
 
 # Pacstrap copies the mirrorlist to the target. Here we make sure that now 
 # *.pacnew files is created for the mirrorlist going forward.
-sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist' $chrt/mnt/etc/pacman.conf
+sed -i '/^\[options\]/a NoExtract = etc/pacman.d/mirrorlist' $root/etc/pacman.conf
 
-echo -e "UUID=$root_uuid\t/\tbtrfs\t$btrfs,subvol=$root_vol\t0 0"                   >>$chrt/mnt/etc/fstab
-echo -e "UUID=$pkg_uuid\t/var/cache/pacman/pkg\tbtrfs\t$btrfs,subvol=$pkg_vol\t0 0" >>$chrt/mnt/etc/fstab
+tee -a $root/etc/pacman.conf >/dev/null <<EOF
+
+[multilib]
+Include  = /etc/pacman.d/mirrorlist
+
+[xyne-x86_64]
+Server   = https://xyne.dev/repos/xyne
+
+[xyne-any]
+Server   = https://xyne.dev/repos/xyne
+
+[$repo_name]
+Server   = file:///mnt/repo/$repo_name
+EOF
+
+if [[ -z $email ]]; then
+  echo 'SigLevel = Optional' >>$root/etc/pacman.conf
+fi
+
+
+echo -e "UUID=$root_uuid\t/\tbtrfs\t$btrfs,subvol=$root_vol\t0 0"                         >>$root/etc/fstab
+echo -e "UUID=$pkg_uuid\t/var/cache/pacman/pkg\tbtrfs\t$btrfs,subvol=$pkg_vol\t0 0"       >>$root/etc/fstab
+
+if [[ $repo ]]; then
+  install -d -- $root/mnt/repo/$repo_name
+  echo -e "UUID=$repo_uuid\t/mnt/repo/$repo_name\tbtrfs\t$btrfs,ro,subvol=$repo_vol\t0 0" >>$root/etc/fstab
+fi
+
+push_clean rm -- "$root"/root/{bash-header2.sh,stage1-root.sh,repo-pubkey.gpg}
+cp -- "$bin"/{bash-header2.sh,stage1-root.sh} $td/repo-pubkey.gpg "$root"/root
+
+
+
+### Install root
+
+push_clean umount -- "$root"
+mount --bind      -- "$root" "$root"
+
+"$root/bin/arch-chroot" "$root" runuser -s /bin/bash - root --\
+  /root/stage1-root.sh ${debug:+-d} ${pacserve:+-s} "$@"
 
 
 
