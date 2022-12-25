@@ -219,9 +219,9 @@ else
 fi
 
 tar xf "$pkg/.bootstrap/$bootstrap" --numeric-owner -C $td
-chrt=$td/root.x86_64
+bstp=$td/root.x86_64
 
-mv $td/mirrorlist $chrt/etc/pacman.d/mirrorlist
+mv $td/mirrorlist $bstp/etc/pacman.d/mirrorlist
 
 
 
@@ -238,22 +238,22 @@ btrfs='noatime,noacl,commit=300,autodefrag,compress=zstd'
 # (apparently)
 #
 # This has to be before mounting "pkg" cache as the mount point of "pkg" would 
-# be inside this "$chrt" mount point. If it is done in the other way around, 
+# be inside this "$bstp" mount point. If it is done in the other way around, 
 # the "pkg" mount point would be empty.
-push_clean umount -- "$chrt"
-mount --bind      -- "$chrt" "$chrt"
+push_clean umount -- "$bstp"
+mount --bind      -- "$bstp" "$bstp"
 
-push_clean umount --                                          "$chrt/mnt"
-mount -t btrfs -o $btrfs,subvol="$root_vol" UUID="$root_uuid" "$chrt/mnt"
+push_clean umount --                                          "$bstp/mnt"
+mount -t btrfs -o $btrfs,subvol="$root_vol" UUID="$root_uuid" "$bstp/mnt"
 
 # Use the centralised pkg cache, so previously downloaded packages are
 # cached locally.
-install -d        --                                          "$chrt/mnt/var/cache/pacman/pkg"
-push_clean umount --                                          "$chrt/mnt/var/cache/pacman/pkg"
-mount -t btrfs -o $btrfs,subvol="$pkg_vol"  UUID="$pkg_uuid"  "$chrt/mnt/var/cache/pacman/pkg"
+install -d        --                                          "$bstp/mnt/var/cache/pacman/pkg"
+push_clean umount --                                          "$bstp/mnt/var/cache/pacman/pkg"
+mount -t btrfs -o $btrfs,subvol="$pkg_vol"  UUID="$pkg_uuid"  "$bstp/mnt/var/cache/pacman/pkg"
 
-push_clean rm -- "$chrt"/root/{bash-header2.sh,stage1-bootstrap.sh}
-cp -- "$bin"/{bash-header2.sh,stage1-bootstrap.sh} "$chrt"/root
+push_clean rm -- "$bstp"/root/{bash-header2.sh,stage1-bootstrap.sh}
+cp -- "$bin"/{bash-header2.sh,stage1-bootstrap.sh} "$bstp"/root
 
 
 
@@ -266,7 +266,7 @@ cp -- "$bin"/{bash-header2.sh,stage1-bootstrap.sh} "$chrt"/root
 #
 # I need arch-install-scripts to place arch-chroot into $root to use next time 
 # (post dropping the bootstrap).
-"$chrt/bin/arch-chroot" "$chrt" runuser -s /bin/bash - root --\
+"$bstp/bin/arch-chroot" "$bstp" runuser -s /bin/bash - root --\
   /root/stage1-bootstrap.sh ${debug:+-d} arch-install-scripts
 
 
@@ -274,8 +274,8 @@ cp -- "$bin"/{bash-header2.sh,stage1-bootstrap.sh} "$chrt"/root
 ### Clean-up after bootstrap.
 
 pop_clean 4
-rm -r $chrt
-unset $chrt
+rm -r $bstp
+unset $bstp
 
 
 
