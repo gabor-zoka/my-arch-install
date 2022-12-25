@@ -58,7 +58,8 @@ pkg=
 repo=
 email=
 pacserve=
-eval set -- "$(getopt -o dr:p:o:e:s -l root:,pkg:,repo:,email:,pacserve -n "$(basename "$0")" -- "$@")"
+hostname=
+eval set -- "$(getopt -o dr:p:o:e:sh: -l root:,pkg:,repo:,email:,pacserve,hostname: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -89,6 +90,11 @@ while true; do
     -s|--pacserve)
       # Optional
       pacserve=y
+      ;;
+    -h|--hostname)
+      # Optional
+      hostname="$2"
+      shift
       ;;
     --)
       shift
@@ -323,8 +329,13 @@ push_clean rm -- "$root"/root/{bash-header2.sh,stage1-root.sh,repo-pubkey.gpg}
 cp -- "$bin"/{bash-header2.sh,stage1-root.sh} $td/repo-pubkey.gpg "$root"/root
 
 
+if [[ $hostname ]]; then
+  echo "$hostname" >$root/etc/hostname
+fi
 
-### Install root
+
+
+### Finalise root
 
 push_clean umount -- "$root"
 mount --bind      -- "$root" "$root"

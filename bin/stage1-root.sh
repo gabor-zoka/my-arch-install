@@ -35,7 +35,7 @@ done
 
 
 
-### Prepare the keyring.
+### Mount pkg and repo
 
 push_clean umount -- /var/cache/pacman/pkg
 mount             -- /var/cache/pacman/pkg
@@ -59,7 +59,7 @@ fi
 
 
 
-### Get latest db-s (note we added new repositories since bootstrap
+### Get latest db-s (note we added new repositories since bootstrap)
 
 pacman --noconfirm -Sy
 
@@ -82,6 +82,8 @@ fi
 
 ### Install
 
-$pacman --noconfirm --needed -S "$@"
+if [[ $# -gt 0 ]]; then
+  $pacman --noconfirm --needed -S "$@"
+fi
 
 onexit 0
