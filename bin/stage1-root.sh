@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-set -e; . /root/bash-header2.sh
+set -e; . "$(dirname "$0")"/bash-header2.sh
 shopt -s nullglob
-
-export LC_ALL=C
-
-# pacman will use a gpg, too, so have our own just like in stage1.sh.
-export GNUPGHOME=$td/.gnupg
-push_clean gpgconf --kill all
 
 
 
@@ -35,6 +29,18 @@ done
 
 
 
+### Env
+
+set +u
+  . /etc/profile
+set -u
+
+# pacman will use a gpg, too, so have our own just like in stage1.sh.
+export GNUPGHOME=$td/.gnupg
+push_clean gpgconf --kill all
+
+
+
 ### Mount pkg and repo
 
 push_clean umount -- /var/cache/pacman/pkg
@@ -51,9 +57,10 @@ fi
 
 ### Pubkey of the custom repo
 
-if [[ -e /root/repo-pubkey.gpg ]]; then
-  pacman-key --add /root/repo-pubkey.gpg
-  keyid="$(gpg --list-packets /root/repo-pubkey.gpg | grep '^:signature packet:' | head -1 | awk '{print $NF}')"
+if [[ -e /root/.my-arch-install/repo-pubkey.gpg ]]; then
+  pacman-key --add /root/.my-arch-install/repo-pubkey.gpg
+  keyid="$(gpg --list-packets /root/.my-arch-install/repo-pubkey.gpg |\
+    grep '^:signature packet:' | head -1 | awk '{print $NF}')"
   pacman-key --lsign-key "$keyid"
 fi
 
@@ -72,10 +79,6 @@ if [[ $pacserve ]]; then
 
   # Adding the pacserve to pacman.conf.
   sed -i '/^\(Include\|Server\) /i Include = /etc/pacman.d/pacserve' /etc/pacman.conf
-
-  pacman=pacsrv
-else
-  pacman=pacman
 fi
 
 
@@ -83,7 +86,7 @@ fi
 ### Install
 
 if [[ $# -gt 0 ]]; then
-  $pacman --noconfirm --needed -S "$@"
+  pacman --noconfirm --needed -S "$@"
 fi
 
 onexit 0

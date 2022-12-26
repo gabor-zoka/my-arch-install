@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-set -e; . /root/bash-header2.sh
+set -e; . "$(dirname "$0")"/bash-header2.sh
 shopt -s nullglob
-
-export LC_ALL=C
-
-# pacman will use a gpg, too, so have our own just like in stage1.sh.
-export GNUPGHOME=$td/.gnupg
-push_clean gpgconf --kill all
 
 
 
@@ -28,6 +22,16 @@ while true; do
   esac
   shift
 done
+
+
+
+### Env
+
+export LC_ALL=C
+
+# pacman will use a gpg, too, so have our own just like in stage1.sh.
+export GNUPGHOME=$td/.gnupg
+push_clean gpgconf --kill all
 
 
 

@@ -59,7 +59,8 @@ repo=
 email=
 pacserve=
 hostname=
-eval set -- "$(getopt -o dr:p:o:e:sh: -l root:,pkg:,repo:,email:,pacserve,hostname: -n "$(basename "$0")" -- "$@")"
+home=
+eval set -- "$(getopt -o dr:p:o:e:sn:h: -l root:,pkg:,repo:,email:,pacserve,hostname:,home: -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
@@ -91,9 +92,14 @@ while true; do
       # Optional
       pacserve=y
       ;;
-    -h|--hostname)
+    -n|--hostname)
       # Optional
       hostname="$2"
+      shift
+      ;;
+    -h|--home)
+      # Optional
+      home="$2"
       shift
       ;;
     --)
@@ -180,6 +186,15 @@ fi
 
 
 
+### Home dir (optional)
+
+if [[ $home ]]; then
+  home_vol="$(btrfs su show -- "$home" | head -1)"
+  read -r home_uuid < <(findmnt -o UUID -nfT "$home")
+fi
+
+
+
 ### Obtain mirrorlist.
 
 country="$(curl -sS https://ipapi.co/country)"
@@ -252,8 +267,9 @@ install -d        --                                          "$bstp/mnt/var/cac
 push_clean umount --                                          "$bstp/mnt/var/cache/pacman/pkg"
 mount -t btrfs -o $btrfs,subvol="$pkg_vol"  UUID="$pkg_uuid"  "$bstp/mnt/var/cache/pacman/pkg"
 
-push_clean rm -- "$bstp"/root/{bash-header2.sh,stage1-bootstrap.sh}
-cp -- "$bin"/{bash-header2.sh,stage1-bootstrap.sh} "$bstp"/root
+push_clean rm -r -- "$bstp"/root/.my-arch-install
+install       -d -- "$bstp"/root/.my-arch-install
+cp -- "$bin"/{bash-header2.sh,stage1-bootstrap.sh} "$bstp"/root/.my-arch-install
 
 
 
@@ -267,7 +283,7 @@ cp -- "$bin"/{bash-header2.sh,stage1-bootstrap.sh} "$bstp"/root
 # I need arch-install-scripts to place arch-chroot into $root to use next time 
 # (post dropping the bootstrap).
 "$bstp/bin/arch-chroot" "$bstp" runuser -s /bin/bash - root --\
-  /root/stage1-bootstrap.sh ${debug:+-d} arch-install-scripts
+  /root/.my-arch-install/stage1-bootstrap.sh ${debug:+-d} arch-install-scripts
 
 
 
@@ -317,16 +333,22 @@ if [[ -z $email ]]; then
 fi
 
 
-echo -e "UUID=$root_uuid\t/\tbtrfs\t$btrfs,subvol=$root_vol\t0 0"                         >>$root/etc/fstab
-echo -e "UUID=$pkg_uuid\t/var/cache/pacman/pkg\tbtrfs\t$btrfs,subvol=$pkg_vol\t0 0"       >>$root/etc/fstab
+echo -e "UUID=$root_uuid\t/\tbtrfs\t$btrfs,subvol=$root_vol\t0 0"                      >>$root/etc/fstab
+echo -e "UUID=$pkg_uuid\t/var/cache/pacman/pkg\tbtrfs\t$btrfs,subvol=$pkg_vol\t0 0"    >>$root/etc/fstab
 
 if [[ $repo ]]; then
   install -d -- $root/mnt/repo/$repo_name
-  echo -e "UUID=$repo_uuid\t/mnt/repo/$repo_name\tbtrfs\t$btrfs,ro,subvol=$repo_vol\t0 0" >>$root/etc/fstab
+  echo -e "UUID=$repo_uuid\t/mnt/repo/$repo_name\tbtrfs\t$btrfs,subvol=$repo_vol\t0 0" >>$root/etc/fstab
 fi
 
-push_clean rm -- "$root"/root/{bash-header2.sh,stage1-root.sh,repo-pubkey.gpg}
-cp -- "$bin"/{bash-header2.sh,stage1-root.sh} $td/repo-pubkey.gpg "$root"/root
+if [[ $home ]]; then
+  echo -e "UUID=$home_uuid\t/home\tbtrfs\t$btrfs,subvol=$home_vol\t0 0"                >>$root/etc/fstab
+fi
+
+
+push_clean rm -r -- "$root"/root/.my-arch-install
+install       -d -- "$root"/root/.my-arch-install
+cp -- "$bin"/{bash-header2.sh,stage1-root.sh} $td/repo-pubkey.gpg "$root"/root/.my-arch-install
 
 
 if [[ $hostname ]]; then
@@ -341,7 +363,7 @@ push_clean umount -- "$root"
 mount --bind      -- "$root" "$root"
 
 "$root/bin/arch-chroot" "$root" runuser -s /bin/bash - root --\
-  /root/stage1-root.sh ${debug:+-d} ${pacserve:+-s} "$@"
+  /root/.my-arch-install/stage1-root.sh ${debug:+-d} ${pacserve:+-s} "$@"
 
 
 
