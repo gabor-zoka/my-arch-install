@@ -42,7 +42,7 @@ pacman-key --populate archlinux
 
 # Update the db-s, and also refresh archlinux-keyring. (Often *.iso image has 
 # obsolete keyring, which makes the install fail.)
-pacman -Sy --noconfirm --needed archlinux-keyring
+pacman --noconfirm --needed -Sy archlinux-keyring
 
 
 
