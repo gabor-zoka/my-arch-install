@@ -1,32 +1,17 @@
 #!/usr/bin/env bash
-set -e; . /root/bash-header2.sh
+set -e; . "$(dirname "$0")"/bash-header2.sh
 shopt -s nullglob
-
-export LC_ALL=C
-
-# pacman will use a gpg, too, so have our own just like in stage1.sh.
-export GNUPGHOME=$td/.gnupg
-push_clean gpgconf --kill all
 
 
 
 ### Parameters.
 
-host=
-pacserve=
-eval set -- "$(getopt -o dh:p -l host:,pacserve -n "$(basename "$0")" -- "$@")"
+eval set -- "$(getopt -o d -n "$(basename "$0")" -- "$@")"
 while true; do
   case $1 in
     -d)
       set -x
       ;;    
-    -h|--host)
-      host="$2"
-      shift
-      ;;
-    -p|--pacserve)
-      pacserve=y
-      ;;
     --)
       shift
       break
@@ -38,60 +23,17 @@ while true; do
   shift
 done
 
-case $host in
-  bud|gla)
-    keymap=us-altgr-intl-console-hu
-    ;;
-  laptop)
-    keymap=hu
-    ;;
-  *)
-    echo "ERROR: host = $host is invalid" >&2
-    onexit 1
-esac
+host=$(cat /etc/hostname)
 
 
 
-### Adding my pub key
+### Essential installs
 
-curl -sS -o $td/gabor-zoka.asc\
-  https://raw.githubusercontent.com/gabor-zoka/personal/master/public-key.asc
-
-pacman-key --add $td/gabor-zoka.asc
-pacman-key --lsign-key "$(gpg --list-packets $td/gabor-zoka.asc |\
-  perl -lne 'if(m{^\s+keyid:\s*(.*)}){print $1;exit()}')"
-
-
-
-### Install Pacserve
-
-tee -a /etc/pacman.conf >/dev/null <<'EOF'
-[multilib]
-Include  = /etc/pacman.d/mirrorlist
-
-[xyne-x86_64]
-SigLevel = Required
-Server   = https://xyne.dev/repos/xyne
-
-[xyne-any]
-SigLevel = Required
-Server   = https://xyne.dev/repos/xyne
-
-[custom-repo]
-SigLevel = Required
-Server   = file:///mnt/repo
-EOF
-
-if [[ $pacserve ]]; then
-  pacman -Sy --noconfirm --needed pacserve
-
-  # Adding the pacserve to pacman.conf.
-  sed -i '/^\(Include\|Server\) /i Include = /etc/pacman.d/pacserve' /etc/pacman.conf
-
-  pacman=pacsrv
-else
-  pacman=pacman
-fi
+# - I need perl for editing config files.
+# - I need mkinitcpio so I can edit before installing linux-lts, which will 
+#   kick off the ramdisk generation. So this way I do not need to manually kick 
+#   it off
+pacman --noconfirm --needed -Sy perl mkinitcpio
 
 
 
@@ -166,6 +108,21 @@ perl -i -pe '$z+=s{^HOOKS=.*}{HOOKS=('"$(echo ${hooks[@]})"')};END{die if $z!=1}
 
 ### /etc/vconsole.conf (needed for generating the ramdisk) 
 
+keymap=
+list=
+case $host in
+  bud|gla)
+    keymap=us-altgr-intl-console-hu
+    list=bud
+    ;;
+  laptop)
+    keymap=laptop
+    ;;
+  *)
+    echo "ERROR: host = $host is invalid" >&2
+    onexit 1
+esac
+
 cat >/etc/vconsole.conf <<EOF
 KEYMAP=$keymap
 FONT=Lat2-Terminus16
@@ -175,7 +132,20 @@ EOF
 
 ### Install everything.
 
-$pacman -Sy --noconfirm --needed $(cat /root/grp.list /root/exp.list)
+grep -vh '^[[:space:]]*\(#\|$\)' /home/gabor/arch/my-arch-install/list/"$list"/{grp.list,exp.list} |\
+  xargs pacman --noconfirm --needed -S
+
+
+
+### Pacnew check
+
+# Sanity check: I am not supposed to have config updates.
+if [[ $(find /etc -iname '*.pacnew') ]]; then
+  echo "ERROR: *.pacnew file(s) in /etc"
+  onexit 1
+fi
+
+
 
 # There was an issue umounting /run dir. So it seems we need to sleep a bit 
 # before arch-chroot umounts everything.
